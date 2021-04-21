@@ -6,11 +6,11 @@ Orbital (https://github.com/orbitalweb) is a project to explore possibilities fo
 
 Echidna explores a radically new interface context for apps on this new browser. Currently, web apps are evolved from a text interface with 2D widgets/icons/mouse/etc. Echidna fully incorporates 3D interfaces instead.
 
-Echidna introduces _the bubble_, a virtual space for people to collaborate using the same app with any hardware. A bubble can map onto reality, for instance, onto a table in a conference room. Security and privacy inside a bubble are very important for Echidna.
+**The Bubble** - Echidna introduces the bubble, a virtual space for people to collaborate using the same app with any hardware. A bubble can map onto reality, for instance, onto a table in a conference room. Security and privacy inside a bubble are very important for Echidna.
 
-Next to bubbles, Echidna adds a whole bunch of new _human interaction events_ to the already available mouse, touch and keyboard. This includes body language, facial expressions, speech, hand gestures, eye tracking, etc.
+**Human Interaction Events** - Next to bubbles, Echidna adds a whole bunch of new human interaction events to the already available mouse, touch and keyboard. This includes body language, facial expressions, speech, hand gestures, eye tracking, etc.
 
-Echidna also introduces _complete sharing of resources_ inside a bubble. Users with different kinds of hardware can use all available resources from the bubble. Code can automatically migrate between platforms to optimize the overall experience for the team. This can be for interactive reasons, but also to improve performance, battery usage, etc.
+**Complete Sharing of Resources** - Echidna also introduces inside a bubble. Users with different kinds of hardware can use all available resources from the bubble. Code can automatically migrate between platforms to optimize the overall experience for the team. This can be for interactive reasons, but also to improve performance, battery usage, etc.
 
 Echidna prefers not to use any cloud computation, but that might not always be achievable or practical.
 
