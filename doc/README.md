@@ -8,17 +8,17 @@ Echidna explores a radically new interface context for apps on this new browser.
 
 **The Bubble** - Echidna introduces the bubble, a virtual space for people to collaborate using the same app with any hardware. A bubble can map onto reality, for instance, onto a table in a conference room. Security and privacy inside a bubble are very important for Echidna.
 
-**Human Interaction Events** - Next to bubbles, Echidna adds a whole bunch of new human interaction events to the already available mouse, touch and keyboard. This includes body language, facial expressions, speech, hand gestures, eye tracking, etc.
+**Human Interaction Events** - Next to bubbles, Echidna adds a whole bunch of new human interaction events to the already available mouse, touch and keyboard. This includes body language, facial expressions, speech, hand gestures, eye tracking, etc. Apps can and should respond to all of them, wherever sensible. In a bubble, one global understanding is maintained, of the users and their subsequently generated events.
 
-**Complete Sharing of Resources** - Echidna also introduces inside a bubble. Users with different kinds of hardware can use all available resources from the bubble. Code can automatically migrate between platforms to optimize the overall experience for the team. This can be for interactive reasons, but also to improve performance, battery usage, etc.
+**Complete Sharing of Resources** - Echidna also introduces complete sharing of resources inside a bubble. Users with different kinds of hardware can use all available resources from the other users in the bubble seemlessly. Code can automatically migrate between platforms to optimize the overall experience for the team. This can be for interactive reasons, but also to improve performance, battery usage, etc.
 
 Echidna prefers not to use any cloud computation, but that might not always be achievable or practical.
 
 ## Challenges
 
-Echidna is definitively not synchronous in a way that, for instance, Croquet is. This means there will be a whole bunch of event synchronization challenges inside a bubble.
+One of the biggest challenges is the networking layer, where everyone in the bubble needs to be able to send and receive the important information smoothly. Initially, it will use a subscribe/publish system, sharing topics around, much like ROS. Later, this communication can be refined to include various kinds of streaming and shared memory solutions.
 
-One of the biggest challenges is the networking layer, where everyone in the bubble needs to be able to send and receive the important information smoothly.
+Echidna is definitively not synchronous in a way that, for instance, Croquet is. This means there will be a whole bunch of event synchronization challenges inside a bubble. Events originate depending on which hardware has the best capabilities (and which camera is best positioned).
 
 Then there is 3D representation, which is a Vulkan-like (or even Vulkan itself) API, followed by a ThreeJS-like API for scene graph management.
 
@@ -26,9 +26,7 @@ Using the latest deep learning algorithms for various human interaction events, 
 
 ## Supported Systems
 
-Echidna is being developed on Linux using Rust. This is the most reliable modern compiled language, and allows for smooth compilation to actual WASM environments, once this becomes a thing in Orbital.
-
-Initially, support is being considered for Linux (PC and Raspberry Pi), Windows, MacOS, Android (Samsung Galaxy and Oculus Quest 2) and iOS.
+Echidna is being developed on Linux using Rust. This is the most reliable modern compiled language, and allows for smooth compilation to actual WASM environments, once this becomes a thing.
 
 # Human Interaction Events
 
@@ -56,49 +54,12 @@ Events/features to consider:
 - audio
 - depth
 
-# Considered Hardware
-
-## Cameras
-
-- Intel RealSense D435i
-- Intel RealSense SR300
-- Laptop camera
-- iPhone front camera
-- iPhone back camera
-- Samsung front camera
-- Samsung back camera
-- Oculus?
-
-## Microphones
-
-- Laptop/generic
-- iPhone
-- Samsung
-- Oculus?
-
-## Pointers on Surfaces
-
-- Mouse
-- iPhone multitouch
-- Samsung multitouch
-
-## Pose and Inertia
-
-Devices that understand their position, orientation and maybe inertia:
-
-- iPhone
-- Samsung
-- Oculus
-- VR controller
-
-Devices that explicitly don't support this might need to provide a fixed pose somehow...
-
 # Client Modes
 
-The various ways a user can interact with the app:
+The various ways a user can interact with an app:
 
 - 2D interface on monitor or laptop with a mouse and keyboard
-- 3D VR interface on monitor or laptop, interacting like a 1st or 3rd person game
+- 3D VR interface on monitor or laptop, interacting like a 1st or 3rd person video game
 - 2D interface on a phone with multitouch
 - 3D VR interface on a phone with multitouch
 - 3D AR interface on a phone with multitouch
@@ -107,8 +68,13 @@ The various ways a user can interact with the app:
 
 It's probably possible to switch between different interaction modes, depending on what the app needs.
 
-# Scratch Area
+Some of the 3D information (like an office plan with monitor and camera poses) needs to be inferred from config files.
 
+# === Scratch Area ===
+
+The following still needs to be processed:
+
+```
 so basically:
 - each piece of hardware has a description file that indicates what services it provides
 - services can be derived off of other services automatically via graph completion (video stream can generate various face and hand services (at a cost))
@@ -143,3 +109,4 @@ questions:
 - Further non-cloud software?
 - Are there any other projects that try to combine AR and VR in a meeting place?
 - What can we distill from all of this to inform Orbital of their kernel limitations?
+```
