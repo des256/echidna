@@ -1,12 +1,8 @@
 [package]
-name = "async"
+name = "codec-macros"
 version = "0.1.0"
 authors = ["Desmond Germans <desmond@germansmedia.nl>"]
 edition = "2018"
 
-[dependencies]
-smol = "*"
-
-[dev-dependencies]
-nix = "*"
-timerfd = "*"
+[lib]
+proc-macro = true
