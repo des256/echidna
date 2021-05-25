@@ -4,109 +4,48 @@
 
 Orbital (https://github.com/orbitalweb) is a project to explore possibilities for a new browser. It is believed that the way forward is a microkernel that manages a bunch of tiny WASM modules.
 
-Echidna explores a radically new interface context for apps on this new browser. Currently, web apps are evolved from a text interface with 2D widgets/icons/mouse/etc. Echidna fully incorporates 3D interfaces instead.
+faasm is a project where a microkernel manages a bunch of tiny WASM modules.
 
-**The Bubble** - Echidna introduces the bubble, a virtual space for people to collaborate using the same app with any hardware. A bubble can map onto reality, for instance, onto a table in a conference room. Security and privacy inside a bubble are very important for Echidna.
+This should be the core of a new ecosystem.
 
-**Human Interaction Events** - Next to bubbles, Echidna adds a whole bunch of new human interaction events to the already available mouse, touch and keyboard. This includes body language, facial expressions, speech, hand gestures, eye tracking, etc. Apps can and should respond to all of them, wherever sensible. In a bubble, one global understanding is maintained, of the users and their subsequently generated events.
+The new ecosystem has to be 3D and interact with groups of humans and/or social robots.
 
-**Complete Sharing of Resources** - Echidna also introduces complete sharing of resources inside a bubble. Users with different kinds of hardware can use all available resources from the other users in the bubble seemlessly. Code can automatically migrate between platforms to optimize the overall experience for the team. This can be for interactive reasons, but also to improve performance, battery usage, etc.
+The new ecosystem has to live in an ecosystem of interconnected hardware.
 
-Echidna prefers not to use any cloud computation, but that might not always be achievable or practical.
+The new ecosystem has to have access to everything that happens around, especially human social information.
 
-## Challenges
+It should be possible to run a python session as WASM process.
 
-One of the biggest challenges is the networking layer, where everyone in the bubble needs to be able to send and receive the important information smoothly. Initially, it will use a subscribe/publish system, sharing topics around, much like ROS. Later, this communication can be refined to include various kinds of streaming and shared memory solutions.
+It should be ridiculously easy to develop application software in this ecosystem.
 
-Echidna is definitively not synchronous in a way that, for instance, Croquet is. This means there will be a whole bunch of event synchronization challenges inside a bubble. Events originate depending on which hardware has the best capabilities (and which camera is best positioned).
+That way, the new ecosystem can supply much better group apps.
 
-Then there is 3D representation, which is a Vulkan-like (or even Vulkan itself) API, followed by a ThreeJS-like API for scene graph management.
+That way, robots can connect to a group perception system, regardless of their own limited capabilities (i.e. Siri breaks its confinement and provides much better interaction).
 
-Using the latest deep learning algorithms for various human interaction events, is of secondary concern. Initially, hardware and systems that already support AR/VR interfaces are just used as-is.
+That way, specific hardware can be used to boost the capabilities of both humans and robots.
 
-## Supported Systems
+This technology should not be Google/Facebook/etc. but something independent, small and open source.
 
-Echidna is being developed on Linux using Rust. This is the most reliable modern compiled language, and allows for smooth compilation to actual WASM environments, once this becomes a thing.
+This technology should work radically everywhere.
 
-# Human Interaction Events
+AI algorithms are not the focus here.
 
-Events/features to consider:
+## Take 2
 
-- mouse on surface
-- keyboard
-- world anchor
-- VR controller
-- game pad
-- fingers touch on surface
-- face pose
-- face blendshapes
-- face/user ID, deduced user ID
-- eyes target
-- deduced high-level face events: 'smile', 'blink', 'nod', etc.
-- hand pose
-- finger point targets
-- deduced high-level hand events: various signs, holding up fingers, etc.
-- body pose
-- deduced high-level body events: 'step back', 'lean in', 'sit down', 'stand up', etc.
-- speech events
-- 3D realization of real world
-- video
-- audio
-- depth
+The future of browsing consists of an ecosystem with 3 main points:
 
-# Client Modes
+1. ubiquitous 3D interfaces in AR/VR for groups of people working together
 
-The various ways a user can interact with an app:
+    Think of a 3D game of Jenga in AR, where multiple people touch the virtual tower of blocks
+    Think of a group engineering session, where a teacher explains how a device works, while everyone stands around and points at things
+    Think of a conversation space, where people from all over can meet and chat, in VR and AR
 
-- 2D interface on monitor or laptop with a mouse and keyboard
-- 3D VR interface on monitor or laptop, interacting like a 1st or 3rd person video game
-- 2D interface on a phone with multitouch
-- 3D VR interface on a phone with multitouch
-- 3D AR interface on a phone with multitouch
-- 3D AR interface on hololens or similar
-- 3D VR interface on VR headset
+2. shared hardware of all people in the group
 
-It's probably possible to switch between different interaction modes, depending on what the app needs.
+    Everyone participating in the group allows their hardware to be used for the app.
+    All cameras, screens, buttons, laptop microphones, speakers, etc.
 
-Some of the 3D information (like an office plan with monitor and camera poses) needs to be inferred from config files.
+3. automatic ubiquitous understanding of what's happening in reality, especially human social signals
 
-# === Scratch Area ===
-
-The following still needs to be processed:
-
-```
-so basically:
-- each piece of hardware has a description file that indicates what services it provides
-- services can be derived off of other services automatically via graph completion (video stream can generate various face and hand services (at a cost))
-- that means that actual high-end deep learning algorithms can be considered much later in the process
-- static objects might even need some kind of 3D description (i.e. the guy in VR would like to know where the monitor is that the guy in AR looks at)
-
-security:
-- ask for allowing data to be shared
-- ask to join a bubble
-- ...
-
-bubble:
-- all processing is for the bubble only, should be secure/encrypted
-- everyone needs to confirm their data is used for the bubble, and/or everyone in the bubble can use it
-- real users (with no HW at all) join in real setting
-- fixed users can join in real setting (if their laptop is there), or as VR avatar
-- VR users join as projected avatars, world is streamed to their headset
-- AR users join in real setting, with extra possibilities
-
-apps:
-- meeting with figma-like shared document (through makepad?)
-- vape-o-tron using face expression data
-- falling tower of blocks (with physics sim)
-- watch movie together, throw popcorn, etc.
-
-questions:
-- Big: How much extra use can we get from this sort of collaborative environment over just a meeting?
-- Big: Is it possible to add these features to already existing meeting places and protocols?
-- Are there APIs for standardized avatars in the various VR product lines?
-- Can real users reliably be scanned by other hardware? Is that in any way useful?
-- Is there any good local speech to text software?
-- Further non-cloud software?
-- Are there any other projects that try to combine AR and VR in a meeting place?
-- What can we distill from all of this to inform Orbital of their kernel limitations?
-```
+    All hardware together builds up a 3D understanding of reality, including what everyone is doing and saying. This is the app input.
+    The more hardware, the higher quality this understanding.

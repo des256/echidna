@@ -1,11 +1,8 @@
 [package]
-name = "macros"
+name = "codec"
 version = "0.1.0"
 authors = ["Desmond Germans <desmond@germansmedia.nl>"]
 edition = "2018"
 
-[lib]
-proc-macro = true
-
 [dependencies]
-proc-macro-error = "*"
+macros = { path = "./macros" }
