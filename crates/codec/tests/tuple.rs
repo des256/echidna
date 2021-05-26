@@ -1,7 +1,7 @@
 // Echidna - Codec - tests
 
-mod dump;
-use dump::*;
+//mod dump;
+//use dump::*;
 
 use codec::Codec;
 use macros::codec;
@@ -15,7 +15,7 @@ fn test_tuple() {
     let mut buffer = Vec::<u8>::new();
     source.encode(&mut buffer);
 
-    dump(&buffer);
+    //dump(&buffer);
 
     if let Some((_,target)) = MyTuple::decode(&buffer) {
         println!(".0: {}",target.0);

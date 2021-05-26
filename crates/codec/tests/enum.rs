@@ -1,7 +1,7 @@
 // Echidna - Codec - tests
 
-mod dump;
-use dump::*;
+//mod dump;
+//use dump::*;
 
 use codec::Codec;
 use macros::codec;
@@ -32,7 +32,7 @@ fn test_enum() {
         let source = MyEnum::One;
         let mut buffer = Vec::<u8>::new();
         source.encode(&mut buffer);
-        dump(&buffer);
+        //dump(&buffer);
         if let Some((_,target)) = MyEnum::decode(&buffer) {
             dump_myenum(&target);
         }
@@ -45,7 +45,7 @@ fn test_enum() {
         let source = MyEnum::Two;
         let mut buffer = Vec::<u8>::new();
         source.encode(&mut buffer);
-        dump(&buffer);
+        //dump(&buffer);
         if let Some((_,target)) = MyEnum::decode(&buffer) {
             dump_myenum(&target);
         }
@@ -58,7 +58,7 @@ fn test_enum() {
         let source = MyEnum::Three(15.0);
         let mut buffer = Vec::<u8>::new();
         source.encode(&mut buffer);
-        dump(&buffer);
+        //dump(&buffer);
         if let Some((_,target)) = MyEnum::decode(&buffer) {
             dump_myenum(&target);
         }
@@ -71,7 +71,7 @@ fn test_enum() {
         let source = MyEnum::Four(16.0,17.0);
         let mut buffer = Vec::<u8>::new();
         source.encode(&mut buffer);
-        dump(&buffer);
+        //dump(&buffer);
         if let Some((_,target)) = MyEnum::decode(&buffer) {
             dump_myenum(&target);
         }
@@ -84,7 +84,7 @@ fn test_enum() {
         let source = MyEnum::Five { foo: 9, bar: -19.0, };
         let mut buffer = Vec::<u8>::new();
         source.encode(&mut buffer);
-        dump(&buffer);
+        //dump(&buffer);
         if let Some((_,target)) = MyEnum::decode(&buffer) {
             dump_myenum(&target);
         }

@@ -1,3 +1,9 @@
+// Echidna - Async
+
+//! Asynchronous processing.
+//! 
+//! This currently just re-exports `smol`.
+
 pub use smol::{
     Executor,
     LocalExecutor,

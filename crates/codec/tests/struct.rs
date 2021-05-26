@@ -1,7 +1,7 @@
 // Echidna - Codec - tests
 
-mod dump;
-use dump::*;
+//mod dump;
+//use dump::*;
 
 use codec::Codec;
 use macros::codec;
@@ -20,6 +20,7 @@ struct MyStruct {
     float: f32,
     double: f64,
     stuff: Vec<i32>,
+    hello: String,
 }
 
 #[test]
@@ -37,11 +38,12 @@ fn test_struct() {
         float: 9.0,
         double: -10.0,
         stuff: vec![-2,-1,0,1,2],
+        hello: "Hello, World!".to_string(),
     };
     let mut buffer = Vec::<u8>::new();
     source.encode(&mut buffer);
 
-    dump(&buffer);
+    //dump(&buffer);
 
     if let Some((_,target)) = MyStruct::decode(&buffer) {
         println!("yesno: {}",target.yesno);
@@ -56,6 +58,7 @@ fn test_struct() {
         println!("float: {}",target.float);
         println!("double: {}",target.double);
         println!("stuff: [{},{},{},{},{}]",target.stuff[0],target.stuff[1],target.stuff[2],target.stuff[3],target.stuff[4]);
+        println!("hello: \"{}\"",target.hello);
         assert!(true);
     }
     else {

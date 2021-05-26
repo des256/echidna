@@ -135,18 +135,18 @@ fn render_path(path: &Path) -> String {
                 r += &ident;
             },
             PathSeg::Generic(args) => {
-                r += &'<'.to_string();
+                r += "<";
                 let mut first = true;
                 for arg in args {
                     if first {
                         first = false;
                     }
                     else {
-                        r += &','.to_string();
+                        r += ",";
                     }
                     match arg {
                         GenericArg::Lifetime(ident) => {
-                            r += &'\''.to_string();
+                            r += "\'";
                             r += &ident;
                         },
                         GenericArg::Type(ty) => {
@@ -154,16 +154,17 @@ fn render_path(path: &Path) -> String {
                         },
                         GenericArg::Binding { ident,ty } => {
                             r += &ident;
-                            r += &'='.to_string();
+                            r += "=";
                             r += &render_type(ty.as_ref());
                         },
                         GenericArg::Qualifier { ident,path } => {
                             r += &ident;
-                            r += &" as ".to_string();
+                            r += " as ";
                             r += &render_path(path.as_ref());
                         },
                     }
                 }
+                r += ">";
             },
         }
     }
@@ -232,6 +233,7 @@ fn render_struct(s: &Struct) -> String {
         r += ".size(); ";
     }
     r += "ofs } }";
+    //eprintln!("{}",r);
     r
 }
 
@@ -457,7 +459,7 @@ fn render_enum(e: &Enum) -> String {
         r += ", ";
     }
     r += "} } }";
-    eprintln!("{}",r);
+    //eprintln!("{}",r);
     r
 }
 
@@ -465,7 +467,7 @@ fn render_enum(e: &Enum) -> String {
 pub fn derive_codec(stream: TokenStream) -> TokenStream {
     let mut lexer = Lexer::new(stream);
     if let Some(item) = lexer.parse_item() {
-        eprintln!("{}",item);
+        //eprintln!("{}",item);
         match item {
             Item::Struct(s) => render_struct(&s),
             Item::Tuple(t) => render_tuple(&t),

@@ -82,6 +82,7 @@ impl fmt::Display for Path {
 
 impl Lexer {
     pub(crate) fn parse_path_seg(&mut self) -> Option<PathSeg> {
+
         if self.parse_punct('<') {
             let mut args = Vec::<GenericArg>::new();
             while !self.is_punct('>') {
@@ -147,7 +148,7 @@ impl Lexer {
         let mut segs = Vec::<PathSeg>::new();
         if let Some(seg) = self.parse_path_seg() {
             segs.push(seg);
-            while self.is_punct(':') {
+            while self.is_punct(':') || self.is_punct('<') {
                 self.parse_punct2(':',':');
                 if let Some(seg) = self.parse_path_seg() {
                     segs.push(seg);
