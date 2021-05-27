@@ -47,7 +47,7 @@ impl Participant {
             let socket = UdpSocket::bind("0.0.0.0:0").await.expect("cannot create announcer socket");
             loop {
                 let mut buffer: Vec<u8> = Vec::new();
-                "It's time to wind down...".to_string().encode(&mut buffer);
+                "announce".to_string().encode(&mut buffer);
                 socket.send_to(&buffer,("239.255.0.1",7331)).await.expect("cannot send message");
                 next_time += Duration::from_secs(1);
                 Timer::at(next_time).await;
@@ -61,7 +61,7 @@ impl Participant {
             let mut buffer = vec![0u8; 1024];
             let (n,addr) = socket.recv_from(&mut buffer).await.expect("receive error");
             if let Some((_,message)) = String::decode(&buffer) {
-                println!("Admin: received \"{}\"",message);
+                println!("Admin: received \"{}\" from {:?}",message,addr);
             }
         }    
     }
