@@ -49,3 +49,12 @@ The future of browsing consists of an ecosystem with 3 main points:
 
     All hardware together builds up a 3D understanding of reality, including what everyone is doing and saying. This is the app input.
     The more hardware, the higher quality this understanding.
+
+## Take 3
+
+See video.
+
+## Take 4
+
+After reading up on WebXR, ROS2, OpenCV, etc. it seems the challenge in the end will be in:
+

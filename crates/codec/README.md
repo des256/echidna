@@ -31,5 +31,3 @@ else {
     panic!("data buffer corrupt");
 }
 ```
-
-## 

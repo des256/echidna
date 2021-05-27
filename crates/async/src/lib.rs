@@ -24,4 +24,5 @@ pub use smol::{
     lock,
     net,
     process,
+    spawn,
 };
