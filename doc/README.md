@@ -1,60 +1,80 @@
-# Introduction
+# ECHIDNA
 
-## What is it?
+## Motivation
 
-Orbital (https://github.com/orbitalweb) is a project to explore possibilities for a new browser. It is believed that the way forward is a microkernel that manages a bunch of tiny WASM modules.
+The idea is to reach into the future as far as possible, and try to realize this today.
 
-faasm is a project where a microkernel manages a bunch of tiny WASM modules.
+### Low-level Internet Technology of the Future
 
-This should be the core of a new ecosystem.
+(compiled from various futurists, podcasts and own experiences)
 
-The new ecosystem has to be 3D and interact with groups of humans and/or social robots.
+#### True Multi-User Environment
 
-The new ecosystem has to live in an ecosystem of interconnected hardware.
+Contrary to todays single-user world, where we connect to a network through browsers and apps, the interface of the future is going to be bits of software that run on all sorts of devices, working together to provide optimal experiences to the users.
 
-The new ecosystem has to have access to everything that happens around, especially human social information.
+#### AR/VR/XR becomes simply `Reality`
 
-It should be possible to run a python session as WASM process.
+Currently, AR/VR (or XR) is accessed through the use of specific hardware and/or a browser. Often
+also by becoming a member of something, or logging in to something. In the future, all of this is
+standard for all apps. Apps will always be 3D (with the occasional smart use of 2D surfaces).
 
-It should be ridiculously easy to develop application software in this ecosystem.
+#### Fully Integrated Perception
 
-That way, the new ecosystem can supply much better group apps.
+Since communication and collaboration is about humans, the technology will naturally form itself around understanding humans and in particular, human social signals. The local network of devices around a group of people will maintain a high fidelity model of what is going on with and around
+the people.
 
-That way, robots can connect to a group perception system, regardless of their own limited capabilities (i.e. Siri breaks its confinement and provides much better interaction).
+### Echidna
 
-That way, specific hardware can be used to boost the capabilities of both humans and robots.
+Echidna is a testing garage for this kind of technology. Roughly based on similar efforts in (Social) Robotics. It will be developed entirely in Rust, because of its development speed and built-in safety around memory and multi-threading. Echnidna runs on all platforms.
 
-This technology should not be Google/Facebook/etc. but something independent, small and open source.
+### Potential Directions
 
-This technology should work radically everywhere.
+#### The Browser of the Future
 
-AI algorithms are not the focus here.
+As mentioned, browsing the Internet should be a multi-user thing, not designed around a tiny window into Facebook, Twitter or Google.
 
-## Take 2
+#### Voice Assistants, Social Robots and Internet of Things
 
-The future of browsing consists of an ecosystem with 3 main points:
+The technology can be used as a rich modeling service for a wide variety of social robots and related toys. In order to enhance perception capabilities, the robots can simply connect and take part in the system. This should boost interactive possibilities beyond what is possible now.
 
-1. ubiquitous 3D interfaces in AR/VR for groups of people working together
+It would also potentially lower the manufacturing cost of these robots, since most of the complex perception code is not running on the robot any more.
 
-    Think of a 3D game of Jenga in AR, where multiple people touch the virtual tower of blocks
-    Think of a group engineering session, where a teacher explains how a device works, while everyone stands around and points at things
-    Think of a conversation space, where people from all over can meet and chat, in VR and AR
+#### Video Games
 
-2. shared hardware of all people in the group
+Using this technology allows for development of new kinds of video games, were (groups of) people can play naturally together in any setting.
 
-    Everyone participating in the group allows their hardware to be used for the app.
-    All cameras, screens, buttons, laptop microphones, speakers, etc.
+One of the first steps in this direction is the integration of a Python interpreter over the basic APIs that access Echidna.
 
-3. automatic ubiquitous understanding of what's happening in reality, especially human social signals
+## Roadmap
 
-    All hardware together builds up a 3D understanding of reality, including what everyone is doing and saying. This is the app input.
-    The more hardware, the higher quality this understanding.
+Parallel to the items in this roadmap starts an ongoing trajectory of experiments that can be showcased in blogposts and videos.
 
-## Take 3
+### Basic Ubiquitous Data Network
 
-See video.
+The first step is to reimagine or adopt DDS/RTPS or similar technology to allow for the fastest and most economic possible network communication between all participating devices. Initially, a simplified reliable multicast UDP transport will suffice.
 
-## Take 4
+### Data Inspection and Visualization
 
-After reading up on WebXR, ROS2, OpenCV, etc. it seems the challenge in the end will be in:
+Next to a working data network, start building a tool that allows full realtime inspection of the data, timing, content, etc. Some data could be visualized. Ideally/later this tool can be accessed in a 3D context as wel as a 2D context.
 
+### Data Storage and Playback
+
+The other pillar of the data network is a storage and playback system, that allows examining and re-rendering of activities from earlier.
+
+### Elementary Computer Vision and Analysis
+
+The next step is to implement as many vision/analysis algorithms as possible on each device separately. To save time and effort, leverage existing XR possibilities directly. This should at some point freeze into a rich set of accessible metadata about what each device senses.
+
+### Building the World Model
+
+THIS IS POTENTIALLY THE MOST DIFFICULT!
+
+From what each device gathers individually, a dynamic best World Model is created. Dynamic in that devices can join or leave whenever they want, and the World Model will adapt/switch to lower fidelity information. Best in that the more information is available, the more accurate the World Model will be.
+
+### Integrating AR and VR Platforms
+
+For all supported platforms, integrate the World Model with existing AR and VR facilities.
+
+### One Specific Target
+
+Hopefully, a more focused (and funded) use for Echidna will present itself along the way.
