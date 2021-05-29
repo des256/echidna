@@ -4,10 +4,9 @@
 //use dump::*;
 
 use codec::Codec;
-use macros::codec;
 
-#[derive(codec)]
-struct MyStruct {
+#[derive(Codec)]
+pub struct MyStruct {
     yesno: bool,
     ubyte: u8,
     byte: i8,

@@ -48,6 +48,8 @@ impl fmt::Display for TupleField {
 }
 
 pub(crate) struct Struct {
+    pub(crate) attrs: Vec<Group>,
+    pub(crate) visibility: Visibility,
     pub(crate) ident: String,
     pub(crate) generics: Vec<Generic>,
     pub(crate) wheres: Vec<Where>,
@@ -57,6 +59,14 @@ pub(crate) struct Struct {
 impl fmt::Display for Struct {
     fn fmt(&self,f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut a = String::new();
+        for attr in &self.attrs {
+            a += &format!("#[{}] ",attr);
+        }
+        if let Visibility::Private = self.visibility {
+        }
+        else {
+            a += &format!("{} ",self.visibility);
+        }
         a += &format!("struct {}",self.ident);
         if self.generics.len() > 0 {
             a += "<";
@@ -98,6 +108,8 @@ impl fmt::Display for Struct {
 }
 
 pub(crate) struct Tuple {
+    pub(crate) attrs: Vec<Group>,
+    pub(crate) visibility: Visibility,
     pub(crate) ident: String,
     pub(crate) generics: Vec<Generic>,
     pub(crate) wheres: Vec<Where>,
@@ -107,6 +119,14 @@ pub(crate) struct Tuple {
 impl fmt::Display for Tuple {
     fn fmt(&self,f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut a = String::new();
+        for attr in &self.attrs {
+            a += &format!("#[{}] ",attr);
+        }
+        if let Visibility::Private = self.visibility {
+        }
+        else {
+            a += &format!("{} ",self.visibility);
+        }
         a += &format!("struct {}",self.ident);
         if self.generics.len() > 0 {
             a += "<";
@@ -219,7 +239,7 @@ impl Lexer {
 
     // Struct = `struct` IDENTIFIER [ Generics ] [ WhereClause ] ( `{` [ StructField { `,` StructField } [ `,` ] ] `}` ) | `;` .
     // Tuple = `struct` IDENTIFIER [ Generics ] `(` [ TupleField { `,` TupleField } [ `,` ] ] `)` [ WhereClause ] `;` .
-    pub(crate) fn parse_struct_or_tuple(&mut self) -> Option<StructOrTuple> {
+    pub(crate) fn parse_struct_or_tuple(&mut self,attrs: Vec<Group>,visibility: Visibility) -> Option<StructOrTuple> {
         if self.parse_ident("struct") {
             if let Some(ident) = self.parse_some_ident() {
                 let generics = self.parse_generics();
@@ -232,6 +252,8 @@ impl Lexer {
                     }
                     let wheres = self.parse_wheres();
                     Some(StructOrTuple::Tuple(Tuple {
+                        attrs: attrs,
+                        visibility: visibility,
                         ident: ident,
                         generics: generics,
                         wheres: wheres,
@@ -248,6 +270,8 @@ impl Lexer {
                             lexer.parse_punct(',');
                         }
                         Some(StructOrTuple::Struct(Struct {
+                            attrs: attrs,
+                            visibility: visibility,
                             ident: ident,
                             generics: generics,
                             wheres: wheres,

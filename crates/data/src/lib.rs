@@ -2,8 +2,8 @@
 
 use r#async::*;
 
-mod topic;
-pub use topic::*;
+mod peer;
+pub use peer::*;
 
 mod publisher;
 pub use publisher::*;

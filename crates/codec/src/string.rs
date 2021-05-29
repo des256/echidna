@@ -4,15 +4,21 @@ use crate::*;
 
 impl Codec for String {
     fn decode(buffer: &[u8]) -> Option<(usize,Self)> {
-        let a = String::from_utf8_lossy(buffer);
-        Some((a.len(),a.to_string()))
+        if let Some((_,len)) = u32::decode(buffer) {
+            let a = String::from_utf8_lossy(&buffer[4..4 + len as usize]);
+            Some((4 + len as usize,a.to_string()))
+        }
+        else {
+            None
+        }
     }
 
     fn encode(&self,buffer: &mut Vec<u8>) -> usize {
         let slice = self.as_bytes();
-        let len = slice.len();
+        let len = slice.len() as u32;
+        len.encode(buffer);
         buffer.extend_from_slice(slice);
-        len
+        len as usize
     }
 
     fn size(&self) -> usize {

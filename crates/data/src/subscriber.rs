@@ -3,12 +3,12 @@
 use crate::*;
 
 pub struct Subscriber {
-    pub topic: Topic,
+    pub topic: String,
 }
 
 impl Subscriber {
 
-    fn new(topic: Topic) -> Option<Subscriber> {
+    fn new(topic: String) -> Option<Subscriber> {
         return Some(Subscriber {
             topic: topic,
         });

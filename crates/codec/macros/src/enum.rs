@@ -120,6 +120,8 @@ impl fmt::Display for EnumItem {
 }
 
 pub(crate) struct Enum {
+    pub(crate) attrs: Vec<Group>,
+    pub(crate) visibility: Visibility,
     pub(crate) ident: String,
     pub(crate) generics: Vec<Generic>,
     pub(crate) wheres: Vec<Where>,
@@ -129,6 +131,14 @@ pub(crate) struct Enum {
 impl fmt::Display for Enum {
     fn fmt(&self,f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut a = String::new();
+        for attr in &self.attrs {
+            a += &format!("#[{}] ",attr);
+        }
+        if let Visibility::Private = self.visibility {
+        }
+        else {
+            a += &format!("{} ",self.visibility);
+        }
         a += &format!("enum {}",self.ident);
         if self.generics.len() > 0 {
             a += "<";
@@ -234,7 +244,7 @@ impl Lexer {
     }
 
     // Enum = `enum` IDENTIFIER [ Generics ] [ WhereClause ] `{` [ EnumItem { `,` EnumItem } [ `,` ] ] `}` .    
-    pub(crate) fn parse_enum(&mut self) -> Option<Enum> {
+    pub(crate) fn parse_enum(&mut self,attrs: Vec<Group>,visibility: Visibility) -> Option<Enum> {
         if self.parse_ident("enum") {
             if let Some(ident) = self.parse_some_ident() {
                 let generics = self.parse_generics();
@@ -247,6 +257,8 @@ impl Lexer {
                         lexer.parse_punct(',');
                     }
                     Some(Enum {
+                        attrs: attrs,
+                        visibility: visibility,
                         ident: ident,
                         generics: generics,
                         wheres: wheres,

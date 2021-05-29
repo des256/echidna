@@ -4,9 +4,8 @@
 //use dump::*;
 
 use codec::Codec;
-use macros::codec;
 
-#[derive(codec)]
+#[derive(Codec)]
 struct MyTuple(f32,f32);
 
 #[test]

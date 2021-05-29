@@ -97,17 +97,27 @@ impl Lexer {
 
     // Item = { Attr } [ Visibility ] Struct | Tuple | Enum | Union .
     pub(crate) fn parse_item(&mut self) -> Option<Item> {
-        if let Some(s_t) = self.parse_struct_or_tuple() {
-            match s_t {
-                StructOrTuple::Struct(s) => {
-                    Some(Item::Struct(s))
-                },
-                StructOrTuple::Tuple(t) => {
-                    Some(Item::Tuple(t))
-                },
+        let mut attrs = Vec::<Group>::new();
+        while let Some(attr) = self.parse_attr() {
+            attrs.push(attr);
+        }
+        let visibility = self.parse_visibility();
+        if self.is_ident("struct") {
+            if let Some(s_t) = self.parse_struct_or_tuple(attrs,visibility) {
+                match s_t {
+                    StructOrTuple::Struct(s) => {
+                        Some(Item::Struct(s))
+                    },
+                    StructOrTuple::Tuple(t) => {
+                        Some(Item::Tuple(t))
+                    },
+                }
+            }
+            else {
+                panic!("struct corrupt");
             }
         }
-        else if let Some(e) = self.parse_enum() {
+        else if let Some(e) = self.parse_enum(attrs,visibility) {
             Some(Item::Enum(e))
         }
         else {
@@ -463,7 +473,7 @@ fn render_enum(e: &Enum) -> String {
     r
 }
 
-#[proc_macro_derive(codec)]
+#[proc_macro_derive(Codec)]
 pub fn derive_codec(stream: TokenStream) -> TokenStream {
     let mut lexer = Lexer::new(stream);
     if let Some(item) = lexer.parse_item() {

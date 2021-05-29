@@ -24,6 +24,8 @@ pub trait Codec where Self: Sized {
     fn size(&self) -> usize;
 }
 
+pub use macros::*;
+
 mod bool;
 pub use crate::bool::*;
 
