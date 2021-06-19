@@ -211,9 +211,9 @@ fn render_struct(s: &Struct) -> String {
     r += &s.ident;
     r += " { fn decode(b: &[u8]) -> Option<(usize,Self)> { let mut ofs = 0usize; ";
     for field in &s.fields {
-        r += "let ";
+        r += "let f_";
         r += &field.ident;
-        r += "= if let Some((l,";
+        r += " = if let Some((l,";
         r += &field.ident;
         r += ")) = ";
         r += &render_type(field.ty.as_ref());
@@ -226,7 +226,7 @@ fn render_struct(s: &Struct) -> String {
     r += " { ";
     for field in &s.fields {
         r += &field.ident;
-        r += ": ";
+        r += ": f_";
         r += &field.ident;
         r += ", ";
     }
@@ -252,7 +252,7 @@ fn render_tuple(t: &Tuple) -> String {
     r += &t.ident;
     r += " { fn decode(b: &[u8]) -> Option<(usize,Self)> { let mut ofs = 0usize; ";
     for i in 0..t.fields.len() {
-        r += "let f";
+        r += "let f_";
         r += &i.to_string();
         r += " = if let Some((l,f)) = ";
         r += &render_type(t.fields[i].ty.as_ref());
@@ -262,7 +262,7 @@ fn render_tuple(t: &Tuple) -> String {
     r += &t.ident;
     r += "(";
     for i in 0..t.fields.len() {
-        r += "f";
+        r += "f_";
         r += &i.to_string();
         r += ", ";
     }
@@ -279,6 +279,7 @@ fn render_tuple(t: &Tuple) -> String {
         r += ".size(); ";
     }
     r += " ofs } }";
+    //eprintln!("{}",r);
     r
 }
 

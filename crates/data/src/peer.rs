@@ -2,27 +2,21 @@
 
 use {
     crate::*,
-    r#async::{
-        spawn,
-        net::{
-            UdpSocket,
-            Ipv4Addr,
-        },
-    },
     codec::Codec,
-    std::time::{
-        Instant,
-        Duration,
-    },
+    r#async::net::SocketAddr,
 };
 
-#[derive(Codec)]
+#[derive(Codec,Clone)]
 pub struct PublisherDescr {
+    pub id: PublisherId,
+    pub address: SocketAddr,
     pub topic: String,
 }
 
-#[derive(Codec)]
+#[derive(Codec,Clone)]
 pub struct SubscriberDescr {
+    pub id: SubscriberId,
+    pub address: SocketAddr,
     pub topic: String,
 }
 

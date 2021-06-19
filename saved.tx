@@ -1,0 +1,67 @@
+What always happens if you want to get to the forefront of new development and
+new technology is that you don't know what's already going on in the world and
+you need to properly educate yourself about the state of the art. It's not
+just dreaming away, but next to this dreaming, also keep one foot on the
+ground and research the current tech.
+
+I haven't sufficiently done that yet, but here's what I'm thinking right
+now...
+
+Social robotics is all about people and robots. And in my case, it was very
+much about technology and building the software to make these robots into
+real social entities. One of the biggest challenges there is taking the
+available cameras, lidars, microphones, etc. and deploying all sorts of AI to
+understand humans and their social signals. These are things like speech
+detection, face detection, facial expressions, gaze direction, body pose, body
+gestures, etc. These things are really important to us, so they should also be
+really important to social robots.
+
+At this mini conference just now, the question was "what does technology of
+the future look like?" And the trend here ofcourse is that technology slowly
+disappears, so the interfaces of the future are just us and the surroundings,
+and we've mastered UX design all the way up to completely natural human
+interactions. It's built into our homes, cars, etc. and just works. I raise my
+hand, the light changes, I step into the car, and the car drives me where I
+want to go, because that's already obvious somehow.
+
+The same goes for group activities, or theater, dancing, etc. It all just
+works, and I don't need to click on anything or use a touchscreen or log in to
+a session of some sort. It works with AR and VR, people from everywhere can
+virtually join groups, and so on. That's surely the utopia.
+
+So, if you really want to just naively answer "how do we get there?", you'll
+quickly find that, atleast on the input side, the challenges are very similar
+to social robotics: How can we make the system understand what the humans are
+doing. What can we extract beyond the mouseclicks and swipes.
+
+And thinking a little further, you get to a place where all devices that are
+around, whether they are built into the car, or the fridge of the future, etc.
+are helping out creating a clear understanding. And, why wait for this
+technology? People bring their phones and laptops to meetings, so there is
+already hardware that can be used to understand the situation. And this, to
+some extent, is of course what AR is all about.
+
+Sizing up how to actually build something like this, one could think, why not
+just connect the browser of the future to ROS. ROS is a C++/Python networking
+middleware with tools that most robotics labs use to let cameras, lidars,
+motors, AI, path planning, and everything else communicate in a very organized
+way in and around robots. There is a whole bunch of open source ROS projects
+out there that can be leveraged. So that definitely sounds like a good idea.
+
+But then, there is Rust. And Rust claims that it is perfect for systems
+programming, due to it's pedantic shenanigans. I've been playing with Rust for
+the past 3 years or so, and I agree. Rust helps very much with specifying the
+code as clearly as possible, but ROS support in Rust is still a little lacking
+at the moment.
+
+Seems to me that the ideal case is an exploration environment based on
+something like ROS, written in Rust. Network middleware, some visualization
+and recording tools, and then just refactor/reimagine a whole bunch of open
+source projects around social interactions. And at the same time, leverage
+already existing WebXR, ARKit, VR development tools, etc. wherever it makes
+sense. I mean, if it's there and it's good, use it right away.
+
+Building this is a great challenge and exploration of course, but the question
+is still there: Doesn't it make more sense to connect this to ROS? At least
+remain mostly compatible, so that turning the whole thing into a ROS project
+should be easy.

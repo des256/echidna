@@ -2,6 +2,12 @@
 
 use r#async::*;
 
+mod protocol;
+pub use protocol::*;
+
+mod config;
+pub use config::*;
+
 mod peer;
 pub use peer::*;
 
