@@ -36,8 +36,8 @@ pub struct Beacon {
 pub struct Participant {
     pub id: ParticipantId,
     pub address: SocketAddr,
-    pub publishers: Vec<Publisher>,
-    pub subscribers: Vec<Subscriber>,
+    pub publishers: Vec<Arc<Publisher>>,
+    pub subscribers: Vec<Arc<Subscriber>>,
     pub peers: Vec<Peer>,
 }
 
@@ -136,6 +136,14 @@ impl Participant {
         //spawn(async move { Participant::run_admin(admin_this); }).detach();
 
         Participant::run_admin(this).await;
+    }
+
+    pub fn register_publisher(&mut self,publisher: &Arc<Publisher>) {
+        self.publishers.push(Arc::clone(&publisher));
+    }
+
+    pub fn register_subscriber(&mut self,subscriber: &Arc<Subscriber>) {
+        self.subscribers.push(Arc::clone(&subscriber));
     }
 }
 

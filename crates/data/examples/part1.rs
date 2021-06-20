@@ -1,8 +1,5 @@
 use {
-    r#async::{
-        block_on,
-        spawn,
-    },
+    r#async::block_on,
     data::Participant,
     std::sync::{
         Arc,

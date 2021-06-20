@@ -2,12 +2,9 @@
 
 use {
     crate::*,
-    r#async::{
-        net::{
-            UdpSocket,
-            SocketAddr,
-        },
-        spawn,
+    r#async::net::{
+        UdpSocket,
+        SocketAddr,
     },
     codec::Codec,
     std::{
@@ -15,7 +12,6 @@ use {
             Arc,
             Mutex,
         },
-        time::Duration,
         collections::HashMap,
     },
 };
@@ -29,7 +25,6 @@ pub struct PublisherState {
 }
 
 pub struct Publisher {
-    pub configuration: &'static Configuration,
     pub subscribers: Vec<SubscriberDescr>,
     pub id: PublisherId,
     pub socket: UdpSocket,
@@ -40,14 +35,13 @@ pub struct Publisher {
 
 impl Publisher {
 
-    pub async fn new(configuration: &'static Configuration,topic: String) -> Option<Arc<Publisher>> {
+    pub async fn new(topic: String) -> Option<Arc<Publisher>> {
 
         let socket = UdpSocket::bind("0.0.0.0:0").await.expect("cannot create publisher socket");
         // ====
         let address = socket.local_addr().expect("cannot get local address of socket");
 
         let publisher = Arc::new(Publisher {
-            configuration: configuration,
             subscribers: Vec::new(),
             id: rand::random::<u64>(),
             socket: socket,
@@ -61,7 +55,7 @@ impl Publisher {
         });
 
         // spawn loop that processes incoming acknowledgements from subscribers
-        let this = Arc::clone(&publisher);
+        /*let this = Arc::clone(&publisher);
         spawn(async move {
             let mut buffer = vec![0u8; 65536];
             loop {
@@ -82,7 +76,7 @@ impl Publisher {
                     }
                 }
             }
-        }).detach();
+        }).detach();*/
 
         Some(publisher)
     }
@@ -90,8 +84,8 @@ impl Publisher {
     pub async fn send(&self,message: Arc<Vec<u8>>) {
 
         // send all samples to all subscribers
-        let mut total = message.len() / self.configuration.sample_size;
-        if (message.len() % self.configuration.sample_size) != 0 {
+        let mut total = message.len() / SAMPLE_SIZE;
+        if (message.len() % SAMPLE_SIZE) != 0 {
             total += 1;
         }
         
@@ -115,11 +109,11 @@ impl Publisher {
             };
             header.encode(&mut buffer);
             let size = {
-                if offset > (message.len() - (self.configuration.sample_size as usize)) {
+                if offset > (message.len() - SAMPLE_SIZE) {
                     message.len() - offset
                 }
                 else {
-                    self.configuration.sample_size as usize
+                    SAMPLE_SIZE
                 }
             };
             buffer.extend_from_slice(&message[offset..offset + size]);
@@ -132,10 +126,10 @@ impl Publisher {
         }
 
         // send heartbeat to all subscribers
-        let mut buffer = Vec::<u8>::new();
+        /*let mut buffer = Vec::<u8>::new();
         loop {
             
             // send heartbeat to all subscribers until they return
-        }
+        }*/
     }
 }

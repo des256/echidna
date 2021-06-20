@@ -14,7 +14,6 @@ use {
     std::{
         sync::{
             Arc,
-            Mutex,
         },
     },
 };
@@ -23,7 +22,8 @@ pub type SubscriberId = u64;
 
 pub struct SubscriberState {
     pub message_id: MessageId,
-    pub buffers: Vec<Option<Vec<u8>>>,
+    pub received: Vec<bool>,
+    pub buffer: Vec<u8>,
 }
 
 pub struct Subscriber {
@@ -36,7 +36,7 @@ pub struct Subscriber {
 
 impl Subscriber {
 
-    pub async fn new<T>(topic: String,on_message: impl Fn(T) + 'static) -> Option<Arc<Subscriber>> {
+    pub async fn new(topic: String) -> Option<Arc<Subscriber>> {
         let socket = UdpSocket::bind("0.0.0.0:0").await.expect("cannot create subscriber socket");
         let address = socket.local_addr().expect("cannot get local address of socket");
 
@@ -52,7 +52,8 @@ impl Subscriber {
         spawn(async move {
             let mut state = SubscriberState {
                 message_id: 0,
-                buffers: Vec::new(),
+                received: Vec::new(),
+                buffer: Vec::new(),
             };
             let mut buffer = vec![0u8; 65536];
             loop {
@@ -60,7 +61,7 @@ impl Subscriber {
                 if let Some((length,pts)) = PubToSub::decode(&buffer) {
                     match pts {
                         PubToSub::Heartbeat => {
-                            let mut ranges = Vec::<Range>::new();
+                            /*let mut ranges = Vec::<Range>::new();
                             let mut range = Range { min: 0, max: 0, };
                             for buffer in &state.buffers {
                                 range.max += 1;
@@ -71,26 +72,26 @@ impl Subscriber {
                             }
                             ranges.push(range);
                             SubToPub::Ack(Ack { message_id: state.message_id, ranges: ranges, }).encode(&mut buffer);
-                            recv_subscriber.socket.send_to(&buffer,recv_subscriber.publisher_address).await.expect("unable to send acknowledgment to publisher");
+                            recv_subscriber.socket.send_to(&buffer,recv_subscriber.publisher_address).await.expect("unable to send acknowledgment to publisher");*/
                         },
                         PubToSub::Sample(sample) => {
                             let data = &buffer[length..];
                             if sample.message_id != state.message_id {
                                 state.message_id = sample.message_id;
-                                state.buffers = vec![None; sample.total as usize];
+                                state.buffer = Vec::with_capacity(sample.total as usize * SAMPLE_SIZE);
+                                state.received = vec![false; sample.total as usize];
                             }
-                            let mut data = Vec::<u8>::new();
-                            data.extend_from_slice(&buffer[length..]);
-                            state.buffers[sample.index as usize] = Some(data);
+                            state.buffer[(sample.index as usize * SAMPLE_SIZE)..].copy_from_slice(data);
+                            state.received[sample.index as usize] = true;
                             let mut complete = true;
-                            for buffer in &state.buffers {
-                                if let None = buffer {
+                            for received in &state.received {
+                                if !received {
                                     complete = false;
                                     break;
                                 }
                             }
                             if complete {
-                                // call on_message
+                                println!("received message of {} bytes from publisher at {}",state.buffer.len(),address);
                             }
                         },
                     }

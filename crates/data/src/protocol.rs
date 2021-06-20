@@ -44,3 +44,5 @@ pub enum PubToSub {
 pub enum SubToPub {
     Ack(Ack),
 }
+
+pub const SAMPLE_SIZE: usize = 16384;
