@@ -34,7 +34,7 @@ pub struct Subscriber {
 
 impl Subscriber {
 
-    pub async fn new(topic: String) -> Option<Arc<Subscriber>> {
+    pub async fn new(topic: String) -> Arc<Subscriber> {
         let socket = UdpSocket::bind("0.0.0.0:0").await.expect("cannot create subscriber socket");
         let address = socket.local_addr().expect("cannot get local address of socket");
 
@@ -43,11 +43,12 @@ impl Subscriber {
             socket: socket,
             address: address,
             publisher_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0,0,0,0),0)),
-            topic: topic,
+            topic: topic.clone(),
         });
 
-        let recv_subscriber = Arc::clone(&subscriber);
+        let this = Arc::clone(&subscriber);
         spawn(async move {
+            println!("spawning subscriber for topic \"{}\"",topic);
             let mut state = SubscriberState {
                 message_id: 0,
                 received: Vec::new(),
@@ -55,7 +56,8 @@ impl Subscriber {
             };
             let mut buffer = vec![0u8; 65536];
             loop {
-                let (_,address) = recv_subscriber.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
+                println!("receiving...");
+                let (_,address) = this.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
                 println!("received something from {}",address);
                 if let Some((length,pts)) = PubToSub::decode(&buffer) {
                     match pts {
@@ -99,6 +101,6 @@ impl Subscriber {
             }
         }).detach();
         
-        return Some(subscriber);
+        return subscriber;
     }
 }

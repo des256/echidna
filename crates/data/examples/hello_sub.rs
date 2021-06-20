@@ -16,7 +16,7 @@ async fn async_main() {
     let participant = Participant::new();
 
     // create and register hello subscriber
-    let subscriber = Subscriber::new("/hello".to_string()).await.expect("cannot create subscriber");
+    let subscriber = Subscriber::new("/hello".to_string()).await;
     participant.register_subscriber(&subscriber);
 
     // wait forever

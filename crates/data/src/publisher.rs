@@ -118,7 +118,7 @@ impl Publisher {
                 total: total as u32,
                 index: index,
             };
-            println!("    header: {{ message_id: {}, total: {}, index: {}, }}",header.message_id,header.total,header.index);
+            println!("    header: {{ message_id: {:016X}, total: {}, index: {}, }}",header.message_id,header.total,header.index);
             header.encode(&mut buffer);
             let size = {
                 if (offset + SAMPLE_SIZE) > message.len() {
