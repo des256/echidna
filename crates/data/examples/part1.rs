@@ -8,8 +8,6 @@ use {
 };
 
 fn main() {
-    if let Some(participant) = Participant::new() {
-        let this = Arc::new(Mutex::new(participant));
-        block_on(Participant::run(this));
-    }
+    let participant = Participant::new();
+    
 }
