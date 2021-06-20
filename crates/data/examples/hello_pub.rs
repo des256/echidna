@@ -24,10 +24,7 @@ async fn async_main() {
 
     // create and register hello publisher
     let publisher = Publisher::new("/hello".to_string()).await.expect("cannot create publisher");
-    {
-        let mut p = participant.lock().expect("cannot lock participant");
-        p.register_publisher(&publisher);
-    }
+    participant.register_publisher(&publisher);
 
     // prepare message
     let mut message = Vec::<u8>::new();

@@ -16,11 +16,8 @@ async fn async_main() {
     let participant = Participant::new();
 
     // create and register hello subscriber
-    let subscriber = Subscriber::new("/hello".to_string()).await.expect("cannot create publisher");
-    {
-        let mut p = participant.lock().expect("cannot lock participant");
-        p.register_subscriber(&subscriber);
-    }
+    let subscriber = Subscriber::new("/hello".to_string()).await.expect("cannot create subscriber");
+    participant.register_subscriber(&subscriber);
 
     // wait forever
     loop {

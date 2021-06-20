@@ -20,7 +20,6 @@ pub struct Endpoint {
 #[derive(Codec)]
 pub struct Beacon {
     pub id: ParticipantId,
-    pub publishers: HashMap<PublisherId,Endpoint>,
     pub subscribers: HashMap<SubscriberId,Endpoint>,
 }
 
