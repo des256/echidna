@@ -89,7 +89,6 @@ impl Publisher {
         if (message.len() % SAMPLE_SIZE) != 0 {
             total += 1;
         }
-        println!("sending message of {} bytes, total chunks = {}",message.len(),total);
         
         // prepare new message
         let message_id = rand::random::<u64>();
@@ -119,7 +118,7 @@ impl Publisher {
                 index: index,
             };
             println!("    header: {{ message_id: {:016X}, total: {}, index: {}, }}",header.message_id,header.total,header.index);
-            header.encode(&mut buffer);
+            PubToSub::Sample(header).encode(&mut buffer);
             let size = {
                 if (offset + SAMPLE_SIZE) > message.len() {
                     message.len() - offset
