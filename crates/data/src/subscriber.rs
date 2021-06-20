@@ -86,7 +86,9 @@ impl Subscriber {
                             }
                             println!("trying to copy from data ({} bytes) to buffer ({} bytes)",data.len(),state.buffer.len());
                             println!("would be at state.buffer[{}..]",sample.index as usize * SAMPLE_SIZE);
-                            state.buffer[(sample.index as usize * SAMPLE_SIZE)..].copy_from_slice(data);
+                            let start = sample.index as usize * SAMPLE_SIZE;
+                            let end = start + data.len();
+                            state.buffer[start..end].copy_from_slice(data);
                             state.received[sample.index as usize] = true;
 
                             let mut complete = true;
