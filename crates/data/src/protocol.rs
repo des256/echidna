@@ -55,3 +55,5 @@ pub enum SubToPub {
 }
 
 pub const SAMPLE_SIZE: usize = 16384;
+
+pub const MAX_ALIVE: usize = 10;

@@ -16,14 +16,18 @@ use {
     },
 };
 
+pub struct SubscriberRef {
+    pub alive: usize,
+    pub address: SocketAddr,
+}
+
 pub struct PublisherState {
+    pub subscribers: HashMap<SubscriberId,SubscriberRef>,
     pub message_id: Option<MessageId>,
     pub message: Arc<Vec<u8>>,
-    pub arrived: HashMap<SocketAddr,Vec<bool>>,
 }
 
 pub struct Publisher {
-    pub subscribers: HashMap<SubscriberId,SocketAddr>,
     pub id: PublisherId,
     pub socket: UdpSocket,
     pub address: SocketAddr,
@@ -40,15 +44,14 @@ impl Publisher {
         let address = socket.local_addr().expect("cannot get local address of socket");
 
         let publisher = Arc::new(Publisher {
-            subscribers: HashMap::new(),
             id: rand::random::<u64>(),
             socket: socket,
             address: address,
             topic: topic,
             state: Mutex::new(PublisherState {
+                subscribers: HashMap::new(),
                 message_id: None,
                 message: Arc::new(Vec::new()),
-                arrived: HashMap::new(),
             }),
         });
 
@@ -88,11 +91,19 @@ impl Publisher {
         }
         println!("sending message of {} bytes, total chunks = {}",message.len(),total);
         
-        // prepare new state for all subscribers
+        // prepare new message
         let message_id = rand::random::<u64>();
-        let mut arrived = HashMap::<SocketAddr,Vec<bool>>::new();
-        for (_id,address) in &self.subscribers {
-            arrived.insert(*address,vec![false; total]);
+
+        // copy subscriber list
+        let mut subscribers = HashMap::<SubscriberId,SubscriberRef>::new();
+        {
+            let state = self.state.lock().expect("cannot lock publisher");
+            for (id,subscriber) in &state.subscribers {
+                subscribers.insert(*id,SubscriberRef {
+                    alive: subscriber.alive,
+                    address: subscriber.address,
+                });
+            }
         }
 
         // send message to all subscribers
@@ -119,9 +130,9 @@ impl Publisher {
             };
             println!("    chunk size: {}",size);
             buffer.extend_from_slice(&message[offset..offset + size]);
-            for (id,address) in &self.subscribers {
-                println!("    sending to subscriber {} at {}",id,*address);
-                self.socket.send_to(&mut buffer,*address).await.expect("error sending data chunk");
+            for (id,subscriber) in &subscribers {
+                println!("    sending to subscriber {} at {}",id,subscriber.address);
+                self.socket.send_to(&mut buffer,subscriber.address).await.expect("error sending data chunk");
                 // ====
             }
             offset += size;

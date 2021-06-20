@@ -66,7 +66,7 @@ impl Participant {
                     subscribers: HashMap::new(),
                 };
                 {
-                    let state = this.state.lock().unwrap();
+                    let state = this.state.lock().expect("cannot lock participant");
                     for subscriber in &state.subscribers {
                         beacon.subscribers.insert(subscriber.id,Endpoint {
                             address: subscriber.address.clone(),
@@ -81,6 +81,25 @@ impl Participant {
 
                 // send it to the multicast group
                 socket.send_to(&buffer,("239.255.0.1",7331)).await.expect("cannot send message");
+
+                // kill subscriber references
+                {
+                    let mut state = this.state.lock().expect("cannot lock participant");
+                    for publisher in &mut state.publishers {
+                        let mut delete_ids = Vec::<SubscriberId>::new();
+                        let mut pubstate = publisher.state.lock().expect("cannot lock publisher");
+                        for (id,subscriber_ref) in &mut pubstate.subscribers {
+                            subscriber_ref.alive -= 1;
+                            if subscriber_ref.alive == 0 {
+                                delete_ids.push(*id);
+                            }
+                        }
+                        for id in delete_ids {
+                            println!("subscriber reference {} of publisher {} died",id,publisher.id);
+                            pubstate.subscribers.remove(&id);
+                        }
+                    }
+                }
 
                 // and wait until next entry
                 next_time += Duration::from_secs(1);
@@ -102,20 +121,29 @@ impl Participant {
                 // receive beacon
                 let mut buffer = vec![0u8; 65536];
                 let (_,address) = socket.recv_from(&mut buffer).await.expect("receive error");
-
                 if let Some((_,beacon)) = Beacon::decode(&buffer) {
                     if beacon.id != this.id {
                         println!("beacon from {:016X} at {:?}",beacon.id,address);
-                        //let th = this.lock().expect("cannot lock participant");
+                        let state = this.state.lock().expect("cannot lock participant");
                         for (id,subscriber) in &beacon.subscribers {
                             println!("    subscriber {:016X} at {:?} for \"{}\"",id,subscriber.address,subscriber.topic);
-                            /*for publisher in &th.publishers {
+                            for publisher in &state.publishers {
                                 if publisher.topic == subscriber.topic {
-                                    if !publisher.subscribers.contains_key(id) {
-                                        publisher.subscribers.insert(*id,subscriber.address);
+                                    let mut pubstate = publisher.state.lock().expect("cannot lock publisher");
+                                    if !pubstate.subscribers.contains_key(id) {
+                                        println!("        new subscriber for publisher {}",publisher.id);
+                                        pubstate.subscribers.insert(*id,SubscriberRef {
+                                            alive: MAX_ALIVE,
+                                            address: subscriber.address,
+                                        });
+                                    }
+                                    else {
+                                        println!("        keeping subscriber for publisher {} alive",publisher.id);
+                                        let mut subscriber_ref = pubstate.subscribers.get_mut(id).expect("cannot get publisher subscriber reference");
+                                        subscriber_ref.alive = MAX_ALIVE;
                                     }
                                 }
-                            }*/
+                            }
                         }
                     }
                 }
