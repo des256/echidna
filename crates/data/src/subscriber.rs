@@ -73,6 +73,7 @@ impl Subscriber {
                             recv_subscriber.socket.send_to(&buffer,recv_subscriber.publisher_address).await.expect("unable to send acknowledgment to publisher");*/
                         },
                         PubToSub::Sample(sample) => {
+                            println!("receiving sample for message {}, index {} of {}",sample.message_id,sample.index,sample.total);
                             let data = &buffer[length..];
                             if sample.message_id != state.message_id {
                                 state.message_id = sample.message_id;
