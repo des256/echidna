@@ -90,7 +90,7 @@ impl Participant {
             }
         }).detach();
 
-        let _this = Arc::clone(&participant);
+        let this = Arc::clone(&participant);
         spawn(async move {
 
             // open local listener on 7331
@@ -99,14 +99,21 @@ impl Participant {
             // join the multicast group
             socket.join_multicast_v4(Ipv4Addr::new(239,255,0,1),Ipv4Addr::new(0,0,0,0)).expect("cannot join multicast group");
 
+            let this_address = {
+                let p = this.lock().expect("cannot lock participant");
+                p.address
+            };
             loop {
 
                 // receive beacon
                 let mut buffer = vec![0u8; 65536];
-                let (_,addr) = socket.recv_from(&mut buffer).await.expect("receive error");
+                let (_,address) = socket.recv_from(&mut buffer).await.expect("receive error");
 
-                if let Some((_,beacon)) = Beacon::decode(&buffer) {
-                    println!("beacon from {:016X} at {:?}",beacon.id,addr);
+                if address == this_address {
+                    println!("received own beacon");
+                }
+                else if let Some((_,beacon)) = Beacon::decode(&buffer) {
+                    println!("beacon from {:016X} at {:?}",beacon.id,address);
                     for (id,publisher) in &beacon.publishers {
                         println!("    publisher {:016X} at {:?} for \"{}\"",id,publisher.address,publisher.topic);
                     }
