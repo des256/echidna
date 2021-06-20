@@ -10,7 +10,6 @@ use {
             SocketAddrV6,
             SocketAddr,
             Ipv4Addr,
-            Ipv6Addr,
             IpAddr,
         },
         Timer,

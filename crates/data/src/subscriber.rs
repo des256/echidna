@@ -20,7 +20,6 @@ use {
 
 pub struct SubscriberState {
     pub message_id: MessageId,
-    pub received: Vec<bool>,
     pub buffer: Vec<u8>,
 }
 
@@ -51,7 +50,6 @@ impl Subscriber {
             println!("spawning subscriber {:016X} for topic \"{}\"",id,topic);
             let mut state = SubscriberState {
                 message_id: 0,
-                received: Vec::new(),
                 buffer: Vec::new(),
             };
             let mut buffer = vec![0u8; 65536];
@@ -75,15 +73,17 @@ impl Subscriber {
                             recv_subscriber.socket.send_to(&buffer,recv_subscriber.publisher_address).await.expect("unable to send acknowledgment to publisher");*/
                         },
                         PubToSub::Sample(sample) => {
-                            println!("receiving sample for message {}, index {} of {}",sample.message_id,sample.index,sample.total);
+                            println!("receiving sample for message {:016X}, index {} of {}",sample.message_id,sample.index,sample.total);
                             let data = &buffer[length..];
+                            println!("chunk size: {}",data.len());
                             if sample.message_id != state.message_id {
+                                println!("this is a new message, so create new buffers");
                                 state.message_id = sample.message_id;
                                 state.buffer = Vec::with_capacity(sample.total as usize * SAMPLE_SIZE);
-                                state.received = vec![false; sample.total as usize];
                             }
+                            println!("trying to copy from data to buffer");
                             state.buffer[(sample.index as usize * SAMPLE_SIZE)..].copy_from_slice(data);
-                            state.received[sample.index as usize] = true;
+                            /*
                             let mut complete = true;
                             for received in &state.received {
                                 if !received {
@@ -94,6 +94,7 @@ impl Subscriber {
                             if complete {
                                 println!("received message of {} bytes from publisher at {}",state.buffer.len(),address);
                             }
+                            */
                         },
                     }
                 }
