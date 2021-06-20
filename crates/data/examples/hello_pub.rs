@@ -26,7 +26,7 @@ async fn async_main() {
     let publisher = Publisher::new("/hello".to_string()).await.expect("cannot create publisher");
     participant.register_publisher(&publisher);
 
-    // prepare message
+    // prepare message (string for now)
     let mut message = Vec::<u8>::new();
     "Hello, World!".to_string().encode(&mut message);
     let message = Arc::new(message);

@@ -114,6 +114,7 @@ impl Publisher {
             let header = SampleHeader {
                 ts: 0,
                 message_id: message_id,
+                size: message.len() as u64,
                 total: total as u32,
                 index: index,
             };

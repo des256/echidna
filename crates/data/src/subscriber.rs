@@ -34,7 +34,7 @@ pub struct Subscriber {
 
 impl Subscriber {
 
-    pub async fn new(topic: String) -> Arc<Subscriber> {
+    pub async fn new(topic: String,on_message: impl Fn(&[u8]) + Send + 'static) -> Arc<Subscriber> {
         let socket = UdpSocket::bind("0.0.0.0:0").await.expect("cannot create subscriber socket");
         let address = socket.local_addr().expect("cannot get local address of socket");
         let id = rand::random::<u64>();
@@ -100,7 +100,7 @@ impl Subscriber {
                             }
 
                             if complete {
-                                println!("received message of {} bytes from publisher at {}",state.buffer.len(),address);
+                                on_message(&state.buffer[0..sample.size as usize]);
                             }
                         },
                     }

@@ -27,6 +27,7 @@ pub struct Beacon {
 pub struct SampleHeader {
     pub ts: u64,
     pub message_id: MessageId,
+    pub size: u64,
     pub total: u32,
     pub index: u32,
 }
