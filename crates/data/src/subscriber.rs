@@ -21,6 +21,7 @@ use {
 pub struct SubscriberState {
     pub message_id: MessageId,
     pub buffer: Vec<u8>,
+    pub received: Vec<bool>,
 }
 
 pub struct Subscriber {
@@ -51,6 +52,7 @@ impl Subscriber {
             let mut state = SubscriberState {
                 message_id: 0,
                 buffer: Vec::new(),
+                received: Vec::new(),
             };
             let mut buffer = vec![0u8; 65536];
             loop {
@@ -78,12 +80,15 @@ impl Subscriber {
                             if sample.message_id != state.message_id {
                                 println!("this is a new message, so create new buffers");
                                 state.message_id = sample.message_id;
-                                state.buffer = Vec::with_capacity(sample.total as usize * SAMPLE_SIZE);
+                                state.buffer = vec![0; sample.total as usize * SAMPLE_SIZE];
+                                state.received = vec![false; sample.total as usize];
+                                println!("buffer at size {}",state.buffer.len());
                             }
                             println!("trying to copy from data ({} bytes) to buffer ({} bytes)",data.len(),state.buffer.len());
-                            println!("would be at slice [{}..]",sample.index as usize * SAMPLE_SIZE);
+                            println!("would be at state.buffer[{}..]",sample.index as usize * SAMPLE_SIZE);
                             state.buffer[(sample.index as usize * SAMPLE_SIZE)..].copy_from_slice(data);
-                            /*
+                            state.received[sample.index as usize] = true;
+
                             let mut complete = true;
                             for received in &state.received {
                                 if !received {
@@ -91,10 +96,10 @@ impl Subscriber {
                                     break;
                                 }
                             }
+
                             if complete {
                                 println!("received message of {} bytes from publisher at {}",state.buffer.len(),address);
                             }
-                            */
                         },
                     }
                 }
