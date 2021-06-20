@@ -9,10 +9,7 @@ use {
         Publisher,
     },
     std::{
-        sync::{
-            Arc,
-            Mutex,
-        },
+        sync::Arc,
         time::{
             Instant,
             Duration,
@@ -44,7 +41,6 @@ async fn async_main() {
         
         next_time += Duration::from_secs(5);
         Timer::at(next_time).await;
-
     }
 }
 

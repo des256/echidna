@@ -1,13 +1,13 @@
 use {
-    r#async::block_on,
+    r#async::{
+        block_on,
+        Timer,
+    },
     data::{
         Participant,
         Subscriber,
     },
-    std::sync::{
-        Arc,
-        Mutex,
-    },
+    std::time::Duration,
 };
 
 async fn async_main() {
@@ -20,6 +20,11 @@ async fn async_main() {
     {
         let mut p = participant.lock().expect("cannot lock participant");
         p.register_subscriber(&subscriber);
+    }
+
+    // wait forever
+    loop {
+        Timer::after(Duration::from_secs(10)).await;
     }
 }
 

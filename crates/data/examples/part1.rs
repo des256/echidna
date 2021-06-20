@@ -1,13 +1,23 @@
 use {
-    r#async::block_on,
-    data::Participant,
-    std::sync::{
-        Arc,
-        Mutex,
+    r#async::{
+        block_on,
+        Timer,
     },
+    data::Participant,
+    std::time::Duration,
 };
 
+async fn async_main() {
+
+    // create participant
+    let _participant = Participant::new();
+
+    // wait forever
+    loop {
+        Timer::after(Duration::from_secs(10)).await;
+    }
+}
+
 fn main() {
-    let participant = Participant::new();
-    
+    block_on(async_main());
 }

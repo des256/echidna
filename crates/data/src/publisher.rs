@@ -91,7 +91,7 @@ impl Publisher {
         // prepare new state for all subscribers
         let message_id = rand::random::<u64>();
         let mut arrived = HashMap::<SocketAddr,Vec<bool>>::new();
-        for (id,address) in &self.subscribers {
+        for (_id,address) in &self.subscribers {
             arrived.insert(*address,vec![false; total]);
         }
 
