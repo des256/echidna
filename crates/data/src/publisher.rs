@@ -110,7 +110,6 @@ impl Publisher {
         let mut index = 0u32;
         let mut offset = 0usize;
         while offset < message.len() {
-            println!("chunk {}:",index);
             let header = SampleHeader {
                 ts: 0,
                 message_id: message_id,
@@ -118,7 +117,6 @@ impl Publisher {
                 total: total as u32,
                 index: index,
             };
-            println!("    header: {{ message_id: {:016X}, total: {}, index: {}, }}",header.message_id,header.total,header.index);
             PubToSub::Sample(header).encode(&mut buffer);
             let size = {
                 if (offset + SAMPLE_SIZE) > message.len() {
@@ -128,10 +126,8 @@ impl Publisher {
                     SAMPLE_SIZE
                 }
             };
-            println!("    chunk size: {}",size);
             buffer.extend_from_slice(&message[offset..offset + size]);
-            for (id,subscriber) in &subscribers {
-                println!("    sending to subscriber {:016X} at {}",id,subscriber.address);
+            for (_,subscriber) in &subscribers {
                 self.socket.send_to(&mut buffer,subscriber.address).await.expect("error sending data chunk");
                 // ====
             }

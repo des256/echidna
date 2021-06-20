@@ -27,14 +27,16 @@ async fn async_main() {
     participant.register_publisher(&publisher);
 
     // prepare message (string for now)
-    let mut message = Vec::<u8>::new();
-    "Hello, World!".to_string().encode(&mut message);
-    let message = Arc::new(message);
+    let message = "This message is published across UDP.".to_string();
+    let mut buffer = Vec::<u8>::new();
+    message.encode(&mut buffer);
+    let buffer = Arc::new(buffer);
 
     // publish message every 5 seconds
     let mut next_time = Instant::now();
     loop {
-        publisher.send(Arc::clone(&message)).await;
+        println!("sending message: {}",message);
+        publisher.send(Arc::clone(&buffer)).await;
         
         next_time += Duration::from_secs(5);
         Timer::at(next_time).await;
