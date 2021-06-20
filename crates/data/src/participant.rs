@@ -99,7 +99,7 @@ impl Participant {
                             }
                         }
                         for id in delete_ids {
-                            println!("subscriber reference {} of publisher {} died",id,publisher.id);
+                            println!("subscriber reference {:016X} for publisher {:016X} died",id,publisher.id);
                             pubstate.subscribers.remove(&id);
                         }
                     }
@@ -131,15 +131,13 @@ impl Participant {
                 };
                 if let Some((_,beacon)) = Beacon::decode(&buffer) {
                     if beacon.id != this.id {
-                        println!("beacon from {:016X} at {:?}",beacon.id,address);
                         let state = this.state.lock().expect("cannot lock participant");
                         for (id,subscriber) in &beacon.subscribers {
-                            println!("    subscriber {:016X} at {:?} for \"{}\"",id,subscriber.address,subscriber.topic);
                             for publisher in &state.publishers {
                                 if publisher.topic == subscriber.topic {
                                     let mut pubstate = publisher.state.lock().expect("cannot lock publisher");
                                     if !pubstate.subscribers.contains_key(id) {
-                                        println!("        new subscriber for publisher {:016X}",publisher.id);
+                                        println!("        new subscriber reference {:016X} for publisher {:016X}",id,publisher.id);
                                         let port = match subscriber.address {
                                             SocketAddr::V4(socketaddrv4) => socketaddrv4.port(),
                                             SocketAddr::V6(socketaddrv6) => socketaddrv6.port(),
@@ -153,7 +151,6 @@ impl Participant {
                                         });
                                     }
                                     else {
-                                        println!("        keeping subscriber reference {:016X} for publisher {:016X} alive",id,publisher.id);
                                         let mut subscriber_ref = pubstate.subscribers.get_mut(id).expect("cannot get publisher subscriber reference");
                                         subscriber_ref.alive = MAX_ALIVE;
                                     }
