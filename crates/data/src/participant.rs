@@ -70,10 +70,18 @@ impl Participant {
             {
                 let p = this.lock().unwrap();
                 for publisher in &p.publishers {
-                    publisher_descrs.push(PublisherDescr { id: publisher.id.clone(),topic: publisher.topic.clone(), });
+                    publisher_descrs.push(PublisherDescr {
+                        id: publisher.id.clone(),
+                        address: publisher.address.clone(),
+                        topic: publisher.topic.clone(),
+                    });
                 }                
                 for subscriber in &p.subscribers {
-                    subscriber_descrs.push(SubscriberDescr { id: subscriber.id.clone(),topic: subscriber.topic.clone(), });
+                    subscriber_descrs.push(SubscriberDescr {
+                        id: subscriber.id.clone(),
+                        address: subscriber.address.clone(),
+                        topic: subscriber.topic.clone(),
+                    });
                 }
             }
             let beacon = Beacon {

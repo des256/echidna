@@ -2,8 +2,10 @@
 
 use {
     crate::*,
+    r#async::net::{
+        SocketAddr,
+    },
     codec::Codec,
-    r#async::net::SocketAddr,
 };
 
 #[derive(Codec,Clone)]

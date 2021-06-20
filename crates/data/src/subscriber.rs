@@ -7,6 +7,8 @@ use {
         net::{
             UdpSocket,
             SocketAddr,
+            SocketAddrV4,
+            Ipv4Addr,
         },
     },
     std::{
@@ -29,11 +31,12 @@ pub struct Subscriber {
     pub socket: UdpSocket,
     pub address: SocketAddr,
     pub publisher_address: SocketAddr,
+    pub topic: String,
 }
 
 impl Subscriber {
 
-    pub async fn new<T>(topic: String,on_message: dyn Fn(T)) -> Option<Arc<Subscriber>> {
+    pub async fn new<T>(topic: String,on_message: impl Fn(T) + 'static) -> Option<Arc<Subscriber>> {
         let socket = UdpSocket::bind("0.0.0.0:0").await.expect("cannot create subscriber socket");
         let address = socket.local_addr().expect("cannot get local address of socket");
 
@@ -41,7 +44,8 @@ impl Subscriber {
             id: rand::random::<u64>(),
             socket: socket,
             address: address,
-            publisher_address: SocketAddr::from("0.0.0.0:0"),
+            publisher_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0,0,0,0),0)),
+            topic: topic,
         });
 
         let recv_subscriber = Arc::clone(&subscriber);
@@ -61,7 +65,7 @@ impl Subscriber {
                             for buffer in &state.buffers {
                                 range.max += 1;
                                 if let None = buffer {
-                                    ranges.push(range);
+                                    ranges.push(Range { min: range.min,max: range.max, });
                                     range.min = range.max;
                                 }
                             }
@@ -92,7 +96,7 @@ impl Subscriber {
                     }
                 }
             }
-        });
+        }).detach();
         
         return Some(subscriber);
     }
