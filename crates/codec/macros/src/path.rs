@@ -125,6 +125,7 @@ impl Lexer {
                         panic!("type expected");
                     }
                 }
+                self.parse_punct(',');
             }
             self.parse_punct('>');
             Some(PathSeg::Generic(args))

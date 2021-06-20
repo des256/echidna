@@ -189,3 +189,95 @@ impl Codec for SocketAddr {
         }
     }   
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::Codec;
+    use r#async::net::{
+        Ipv4Addr,
+        Ipv6Addr,
+        IpAddr,
+        SocketAddrV4,
+        SocketAddrV6,
+        SocketAddr,
+    };
+
+    #[test]
+    fn test_ipv4addr() {
+        let source = Ipv4Addr::new(192,168,1,255);
+        let mut buffer = Vec::<u8>::new();
+        source.encode(&mut buffer);
+        if let Some((_,target)) = Ipv4Addr::decode(&buffer) {
+            assert_eq!(source,target)
+        }
+        else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_ipv6addr() {
+        let source = Ipv6Addr::new(0xFDEC,0xC0BB,0xC329,0,0,0,0,1);
+        let mut buffer = Vec::<u8>::new();
+        source.encode(&mut buffer);
+        if let Some((_,target)) = Ipv6Addr::decode(&buffer) {
+            assert_eq!(source,target)
+        }
+        else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_ipaddr() {
+        let source = IpAddr::V4(Ipv4Addr::new(192,168,1,255));
+        let mut buffer = Vec::<u8>::new();
+        source.encode(&mut buffer);
+        if let Some((_,target)) = IpAddr::decode(&buffer) {
+            assert_eq!(source,target)
+        }
+        else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_socketaddrv4() {
+        let source = SocketAddrV4::new(Ipv4Addr::new(192,168,1,255),8080);
+        let mut buffer = Vec::<u8>::new();
+        source.encode(&mut buffer);
+        if let Some((_,target)) = SocketAddrV4::decode(&buffer) {
+            assert_eq!(source,target)
+        }
+        else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_socketaddrv6() {
+        let source = SocketAddrV6::new(Ipv6Addr::new(0xFDEC,0xC0BB,0xC329,0,0,0,0,1),8080,0,0);
+        let mut buffer = Vec::<u8>::new();
+        source.encode(&mut buffer);
+        if let Some((_,target)) = SocketAddrV6::decode(&buffer) {
+            assert_eq!(source,target)
+        }
+        else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_socketaddr() {
+        let source = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192,168,1,255),8080));
+        let mut buffer = Vec::<u8>::new();
+        source.encode(&mut buffer);
+        if let Some((_,target)) = SocketAddr::decode(&buffer) {
+            assert_eq!(source,target)
+        }
+        else {
+            assert!(false)
+        }
+    }
+}

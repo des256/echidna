@@ -16,8 +16,6 @@ use {
     },
 };
 
-pub type PublisherId = u64;
-
 pub struct PublisherState {
     pub message_id: Option<MessageId>,
     pub message: Arc<Vec<u8>>,
@@ -25,7 +23,7 @@ pub struct PublisherState {
 }
 
 pub struct Publisher {
-    pub subscribers: HashMap<SubscriberId,Endpoint>,
+    pub subscribers: HashMap<SubscriberId,SocketAddr>,
     pub id: PublisherId,
     pub socket: UdpSocket,
     pub address: SocketAddr,
@@ -93,8 +91,8 @@ impl Publisher {
         // prepare new state for all subscribers
         let message_id = rand::random::<u64>();
         let mut arrived = HashMap::<SocketAddr,Vec<bool>>::new();
-        for (id,endpoint) in &self.subscribers {
-            arrived.insert(endpoint.address,vec![false; total]);
+        for (id,address) in &self.subscribers {
+            arrived.insert(*address,vec![false; total]);
         }
 
         // send message to all subscribers
@@ -121,9 +119,9 @@ impl Publisher {
             };
             println!("    chunk size: {}",size);
             buffer.extend_from_slice(&message[offset..offset + size]);
-            for (id,endpoint) in &self.subscribers {
-                println!("    sending to subscriber at {}",endpoint.address);
-                self.socket.send_to(&mut buffer,endpoint.address).await.expect("error sending data chunk");
+            for (id,address) in &self.subscribers {
+                println!("    sending to subscriber {} at {}",id,*address);
+                self.socket.send_to(&mut buffer,*address).await.expect("error sending data chunk");
                 // ====
             }
             offset += size;

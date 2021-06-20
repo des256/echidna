@@ -12,6 +12,7 @@ use {
     },
     codec::Codec,
     std::{
+        collections::HashMap,
         str::FromStr,
         sync::{
             Arc,
@@ -24,21 +25,11 @@ use {
     },
 };
 
-pub type ParticipantId = u64;
-
-#[derive(Codec)]
-pub struct Beacon {
-    pub id: ParticipantId,
-    pub publishers: Vec<PublisherDescr>,
-    pub subscribers: Vec<SubscriberDescr>,
-}
-
 pub struct Participant {
     pub id: ParticipantId,
     pub address: SocketAddr,
     pub publishers: Vec<Arc<Publisher>>,
     pub subscribers: Vec<Arc<Subscriber>>,
-    pub peers: Vec<Peer>,
 }
 
 impl Participant {
@@ -49,7 +40,6 @@ impl Participant {
             address: SocketAddr::from_str("0.0.0.0:0").expect("cannot create socket address"),
             publishers: Vec::new(),
             subscribers: Vec::new(),
-            peers: Vec::new(),
         })
     }
 
@@ -64,31 +54,27 @@ impl Participant {
 
         loop {
 
-            // create beacon struct
-            let mut publisher_descrs = Vec::<PublisherDescr>::new();
-            let mut subscriber_descrs = Vec::<SubscriberDescr>::new();
+            // create beacon
+            let mut beacon = Beacon {
+                id: id.clone(),
+                publishers: HashMap::new(),
+                subscribers: HashMap::new(),
+            };
             {
-                let p = this.lock().unwrap();
-                for publisher in &p.publishers {
-                    publisher_descrs.push(PublisherDescr {
-                        id: publisher.id.clone(),
+                let participant = this.lock().unwrap();
+                for publisher in &participant.publishers {
+                    beacon.publishers.insert(publisher.id,Endpoint {
                         address: publisher.address.clone(),
                         topic: publisher.topic.clone(),
                     });
-                }                
-                for subscriber in &p.subscribers {
-                    subscriber_descrs.push(SubscriberDescr {
-                        id: subscriber.id.clone(),
+                }
+                for subscriber in &participant.subscribers {
+                    beacon.subscribers.insert(subscriber.id,Endpoint {
                         address: subscriber.address.clone(),
                         topic: subscriber.topic.clone(),
                     });
                 }
             }
-            let beacon = Beacon {
-                id: id.clone(),
-                publishers: publisher_descrs,
-                subscribers: subscriber_descrs,
-            };
 
             // encode it
             let mut buffer: Vec<u8> = Vec::new();
@@ -119,26 +105,19 @@ impl Participant {
 
             if let Some((_,beacon)) = Beacon::decode(&buffer) {
                 println!("beacon from {:016X} at {:?}",beacon.id,addr);
-                for publisher in &beacon.publishers {
-                    println!("    publisher {:016X} at {:?} for \"{}\"",publisher.id,publisher.address,publisher.topic);
+                for (id,publisher) in &beacon.publishers {
+                    println!("    publisher {:016X} at {:?} for \"{}\"",id,publisher.address,publisher.topic);
                 }
                 let th = this.lock().expect("cannot lock participant");
-                for subscriber in &beacon.subscribers {
-                    println!("    subscriber {:016X} at {:?} for \"{}\"",subscriber.id,subscriber.address,subscriber.topic);
-                    for p in &th.publishers {
-                        if p.topic == subscriber.topic {
-                            let mut found = false;
-                            for s in &p.subscribers {
-                                if s.id == subscriber.id {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if !found {
-                                p.subscribers.push(subscriber.clone());
+                for (id,subscriber) in &beacon.subscribers {
+                    println!("    subscriber {:016X} at {:?} for \"{}\"",id,subscriber.address,subscriber.topic);
+                    /*for publisher in &th.publishers {
+                        if publisher.topic == subscriber.topic {
+                            if !publisher.subscribers.contains_key(id) {
+                                publisher.subscribers.insert(*id,subscriber.address);
                             }
                         }
-                    }
+                    }*/
                 }
             }
         }

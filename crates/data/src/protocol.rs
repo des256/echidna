@@ -1,17 +1,20 @@
 // Echidna - Data
 
 use {
-    crate::*,
+    r#async::net::SocketAddr,
     codec::Codec,
     std::collections::HashMap,
 };
 
+pub type ParticipantId = u64;
+pub type SubscriberId = u64;
+pub type PublisherId = u64;
 pub type MessageId = u64;
 
 #[derive(Codec)]
-pub struct Range {
-    pub min: u32,
-    pub max: u32,
+pub struct Endpoint {
+    pub address: SocketAddr,
+    pub topic: String,
 }
 
 #[derive(Codec)]
@@ -30,15 +33,21 @@ pub struct SampleHeader {
 }
 
 #[derive(Codec)]
-pub struct Ack {
-    pub message_id: MessageId,
-    pub ranges: Vec<Range>,  // These are the samples I received
-}
-
-#[derive(Codec)]
 pub enum PubToSub {
     Heartbeat,
     Sample(SampleHeader),  // rest of the packet contains the data
+}
+
+#[derive(Codec)]
+pub struct Range {
+    pub min: u32,
+    pub max: u32,
+}
+
+#[derive(Codec)]
+pub struct Ack {
+    pub message_id: MessageId,
+    pub ranges: Vec<Range>,
 }
 
 #[derive(Codec)]

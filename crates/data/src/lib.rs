@@ -5,9 +5,6 @@ use r#async::*;
 mod protocol;
 pub use protocol::*;
 
-mod peer;
-pub use peer::*;
-
 mod publisher;
 pub use publisher::*;
 

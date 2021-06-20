@@ -18,8 +18,6 @@ use {
     },
 };
 
-pub type SubscriberId = u64;
-
 pub struct SubscriberState {
     pub message_id: MessageId,
     pub received: Vec<bool>,
