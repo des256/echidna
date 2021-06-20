@@ -25,7 +25,7 @@ pub struct PublisherState {
 }
 
 pub struct Publisher {
-    pub subscribers: Vec<SubscriberDescr>,
+    pub subscribers: HashMap<SubscriberId,Endpoint>,
     pub id: PublisherId,
     pub socket: UdpSocket,
     pub address: SocketAddr,
@@ -42,7 +42,7 @@ impl Publisher {
         let address = socket.local_addr().expect("cannot get local address of socket");
 
         let publisher = Arc::new(Publisher {
-            subscribers: Vec::new(),
+            subscribers: HashMap::new(),
             id: rand::random::<u64>(),
             socket: socket,
             address: address,
@@ -93,8 +93,8 @@ impl Publisher {
         // prepare new state for all subscribers
         let message_id = rand::random::<u64>();
         let mut arrived = HashMap::<SocketAddr,Vec<bool>>::new();
-        for subscriber in &self.subscribers {
-            arrived.insert(subscriber.address,vec![false; total]);
+        for (id,endpoint) in &self.subscribers {
+            arrived.insert(endpoint.address,vec![false; total]);
         }
 
         // send message to all subscribers
@@ -121,9 +121,9 @@ impl Publisher {
             };
             println!("    chunk size: {}",size);
             buffer.extend_from_slice(&message[offset..offset + size]);
-            for subscriber in &self.subscribers {
-                println!("    sending to subscriber at {}",subscriber.address);
-                self.socket.send_to(&mut buffer,subscriber.address).await.expect("error sending data chunk");
+            for (id,endpoint) in &self.subscribers {
+                println!("    sending to subscriber at {}",endpoint.address);
+                self.socket.send_to(&mut buffer,endpoint.address).await.expect("error sending data chunk");
                 // ====
             }
             offset += size;

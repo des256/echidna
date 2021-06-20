@@ -50,5 +50,8 @@ pub use string::*;
 mod vec;
 pub use vec::*;
 
+mod hashmap;
+pub use hashmap::*;
+
 mod addrs;
 pub use addrs::*;

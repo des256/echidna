@@ -3,6 +3,7 @@
 use {
     crate::*,
     codec::Codec,
+    std::collections::HashMap,
 };
 
 pub type MessageId = u64;
@@ -16,8 +17,8 @@ pub struct Range {
 #[derive(Codec)]
 pub struct Beacon {
     pub id: ParticipantId,
-    pub publishers: Vec<PublisherDescr>,
-    pub subscribers: Vec<SubscriberDescr>,
+    pub publishers: HashMap<PublisherId,Endpoint>,
+    pub subscribers: HashMap<SubscriberId,Endpoint>,
 }
 
 #[derive(Codec)]

@@ -103,7 +103,7 @@ impl Participant {
         }
     }
 
-    pub async fn run_admin(_this: Arc<Mutex<Self>>) {
+    pub async fn run_admin(this: Arc<Mutex<Self>>) {
 
         // open local listener on 7331
         let socket = UdpSocket::bind("0.0.0.0:7331").await.expect("cannot create admin socket");
@@ -122,8 +122,23 @@ impl Participant {
                 for publisher in &beacon.publishers {
                     println!("    publisher {:016X} at {:?} for \"{}\"",publisher.id,publisher.address,publisher.topic);
                 }
+                let th = this.lock().expect("cannot lock participant");
                 for subscriber in &beacon.subscribers {
                     println!("    subscriber {:016X} at {:?} for \"{}\"",subscriber.id,subscriber.address,subscriber.topic);
+                    for p in &th.publishers {
+                        if p.topic == subscriber.topic {
+                            let mut found = false;
+                            for s in &p.subscribers {
+                                if s.id == subscriber.id {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if !found {
+                                p.subscribers.push(subscriber.clone());
+                            }
+                        }
+                    }
                 }
             }
         }

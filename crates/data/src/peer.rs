@@ -6,25 +6,20 @@ use {
         SocketAddr,
     },
     codec::Codec,
+    std::{
+        collections::HashMap,
+    },
 };
 
-#[derive(Codec,Clone)]
-pub struct PublisherDescr {
-    pub id: PublisherId,
+#[derive(Codec)]
+pub struct Endpoint {
     pub address: SocketAddr,
-    pub topic: String,
-}
-
-#[derive(Codec,Clone)]
-pub struct SubscriberDescr {
-    pub id: SubscriberId,
-    pub address: SocketAddr,
-    pub topic: String,
+    topic: String,
 }
 
 #[derive(Codec)]
 pub struct Peer {
     pub id: ParticipantId,
-    pub publishers: Vec<PublisherDescr>,
-    pub subscriber: Vec<SubscriberDescr>,
+    pub publishers: HashMap<PublisherId,Endpoint>,
+    pub subscriber: HashMap<SubscriberId,Endpoint>,
 }
