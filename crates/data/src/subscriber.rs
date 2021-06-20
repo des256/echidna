@@ -56,6 +56,7 @@ impl Subscriber {
             let mut buffer = vec![0u8; 65536];
             loop {
                 let (_,address) = recv_subscriber.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
+                println!("received something from {}",address);
                 if let Some((length,pts)) = PubToSub::decode(&buffer) {
                     match pts {
                         PubToSub::Heartbeat => {

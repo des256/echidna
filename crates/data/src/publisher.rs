@@ -131,7 +131,7 @@ impl Publisher {
             println!("    chunk size: {}",size);
             buffer.extend_from_slice(&message[offset..offset + size]);
             for (id,subscriber) in &subscribers {
-                println!("    sending to subscriber {} at {}",id,subscriber.address);
+                println!("    sending to subscriber {:016X} at {}",id,subscriber.address);
                 self.socket.send_to(&mut buffer,subscriber.address).await.expect("error sending data chunk");
                 // ====
             }

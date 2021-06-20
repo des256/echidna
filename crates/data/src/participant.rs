@@ -131,14 +131,14 @@ impl Participant {
                                 if publisher.topic == subscriber.topic {
                                     let mut pubstate = publisher.state.lock().expect("cannot lock publisher");
                                     if !pubstate.subscribers.contains_key(id) {
-                                        println!("        new subscriber for publisher {}",publisher.id);
+                                        println!("        new subscriber for publisher {:016X}",publisher.id);
                                         pubstate.subscribers.insert(*id,SubscriberRef {
                                             alive: MAX_ALIVE,
                                             address: subscriber.address,
                                         });
                                     }
                                     else {
-                                        println!("        keeping subscriber for publisher {} alive",publisher.id);
+                                        println!("        keeping subscriber reference {:016X} for publisher {:016X} alive",id,publisher.id);
                                         let mut subscriber_ref = pubstate.subscribers.get_mut(id).expect("cannot get publisher subscriber reference");
                                         subscriber_ref.alive = MAX_ALIVE;
                                     }
