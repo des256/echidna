@@ -48,7 +48,6 @@ impl Subscriber {
 
         let this = Arc::clone(&subscriber);
         spawn(async move {
-            println!("spawning subscriber {:016X} for topic \"{}\"",id,topic);
             let mut state = SubscriberState {
                 message_id: 0,
                 buffer: Vec::new(),
@@ -56,8 +55,7 @@ impl Subscriber {
             };
             let mut buffer = vec![0u8; 65536];
             loop {
-                let (full_length,address) = this.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
-                println!("received something from {}",address);
+                let (full_length,_) = this.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
                 if let Some((length,pts)) = PubToSub::decode(&buffer) {
                     match pts {
                         PubToSub::Heartbeat => {
@@ -75,22 +73,16 @@ impl Subscriber {
                             recv_subscriber.socket.send_to(&buffer,recv_subscriber.publisher_address).await.expect("unable to send acknowledgment to publisher");*/
                         },
                         PubToSub::Sample(sample) => {
-                            println!("receiving sample for message {:016X}, index {} of {}",sample.message_id,sample.index,sample.total);
                             let data = &buffer[length..full_length];
                             if sample.message_id != state.message_id {
-                                println!("this is a new message, so create new buffers");
                                 state.message_id = sample.message_id;
                                 state.buffer = vec![0; sample.total as usize * SAMPLE_SIZE];
                                 state.received = vec![false; sample.total as usize];
-                                println!("buffer at size {}",state.buffer.len());
                             }
-                            println!("trying to copy from data ({} bytes) to buffer ({} bytes)",data.len(),state.buffer.len());
-                            println!("would be at state.buffer[{}..]",sample.index as usize * SAMPLE_SIZE);
                             let start = sample.index as usize * SAMPLE_SIZE;
                             let end = start + data.len();
                             state.buffer[start..end].copy_from_slice(data);
                             state.received[sample.index as usize] = true;
-
                             let mut complete = true;
                             for received in &state.received {
                                 if !received {
@@ -98,7 +90,6 @@ impl Subscriber {
                                     break;
                                 }
                             }
-
                             if complete {
                                 on_message(&state.buffer[0..sample.size as usize]);
                             }
