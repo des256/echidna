@@ -74,16 +74,14 @@ impl Subscriber {
                         },
                         PubToSub::Sample(sample) => {
                             println!("receiving sample for message {:016X}, index {} of {}",sample.message_id,sample.index,sample.total);
-                            println!("header length: {}",length);
-                            println!("entire message length: {}",full_length);
                             let data = &buffer[length..full_length];
-                            println!("chunk size: {}",data.len());
                             if sample.message_id != state.message_id {
                                 println!("this is a new message, so create new buffers");
                                 state.message_id = sample.message_id;
                                 state.buffer = Vec::with_capacity(sample.total as usize * SAMPLE_SIZE);
                             }
-                            println!("trying to copy from data to buffer");
+                            println!("trying to copy from data ({} bytes) to buffer ({} bytes)",data.len(),state.buffer.len());
+                            println!("would be at slice [{}..]",sample.index as usize * SAMPLE_SIZE);
                             state.buffer[(sample.index as usize * SAMPLE_SIZE)..].copy_from_slice(data);
                             /*
                             let mut complete = true;
