@@ -88,6 +88,7 @@ impl Publisher {
         if (message.len() % SAMPLE_SIZE) != 0 {
             total += 1;
         }
+        println!("sending message of {} bytes, total chunks = {}",message.len(),total);
         
         // prepare new state for all subscribers
         let message_id = rand::random::<u64>();
@@ -101,23 +102,27 @@ impl Publisher {
         let mut index = 0u32;
         let mut offset = 0usize;
         while offset < message.len() {
+            println!("chunk {}:",index);
             let header = SampleHeader {
                 ts: 0,
                 message_id: message_id,
                 total: total as u32,
                 index: index,
             };
+            println!("    header: {{ message_id: {}, total: {}, index: {}, }}",header.message_id,header.total,header.index);
             header.encode(&mut buffer);
             let size = {
-                if offset > (message.len() - SAMPLE_SIZE) {
+                if (offset + SAMPLE_SIZE) > message.len() {
                     message.len() - offset
                 }
                 else {
                     SAMPLE_SIZE
                 }
             };
+            println!("    chunk size: {}",size);
             buffer.extend_from_slice(&message[offset..offset + size]);
             for subscriber in &self.subscribers {
+                println!("    sending to subscriber at {}",subscriber.address);
                 self.socket.send_to(&mut buffer,subscriber.address).await.expect("error sending data chunk");
                 // ====
             }

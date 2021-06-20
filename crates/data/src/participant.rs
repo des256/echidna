@@ -118,11 +118,13 @@ impl Participant {
             let (_,addr) = socket.recv_from(&mut buffer).await.expect("receive error");
 
             if let Some((_,beacon)) = Beacon::decode(&buffer) {
-
-                // inform the publishers about remote subscribers
-                // inform the subscribers about remote publishers
-
-                println!("Admin: beacon from {:016X} at {:?}",beacon.id,addr);
+                println!("beacon from {:016X} at {:?}",beacon.id,addr);
+                for publisher in &beacon.publishers {
+                    println!("    publisher {:016X} at {:?} for \"{}\"",publisher.id,publisher.address,publisher.topic);
+                }
+                for subscriber in &beacon.subscribers {
+                    println!("    subscriber {:016X} at {:?} for \"{}\"",subscriber.id,subscriber.address,subscriber.topic);
+                }
             }
         }
     }
