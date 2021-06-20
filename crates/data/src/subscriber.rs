@@ -54,7 +54,7 @@ impl Subscriber {
             };
             let mut buffer = vec![0u8; 65536];
             loop {
-                let (_,address) = this.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
+                let (full_length,address) = this.socket.recv_from(&mut buffer).await.expect("error receiving sample or heartbeat");
                 println!("received something from {}",address);
                 if let Some((length,pts)) = PubToSub::decode(&buffer) {
                     match pts {
@@ -74,7 +74,9 @@ impl Subscriber {
                         },
                         PubToSub::Sample(sample) => {
                             println!("receiving sample for message {:016X}, index {} of {}",sample.message_id,sample.index,sample.total);
-                            let data = &buffer[length..];
+                            println!("header length: {}",length);
+                            println!("entire message length: {}",full_length);
+                            let data = &buffer[length..full_length];
                             println!("chunk size: {}",data.len());
                             if sample.message_id != state.message_id {
                                 println!("this is a new message, so create new buffers");
