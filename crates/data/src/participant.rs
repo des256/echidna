@@ -6,8 +6,12 @@ use {
         spawn,
         net::{
             UdpSocket,
+            SocketAddrV4,
+            SocketAddrV6,
             SocketAddr,
             Ipv4Addr,
+            Ipv6Addr,
+            IpAddr,
         },
         Timer,
     },
@@ -121,6 +125,10 @@ impl Participant {
                 // receive beacon
                 let mut buffer = vec![0u8; 65536];
                 let (_,address) = socket.recv_from(&mut buffer).await.expect("receive error");
+                let ip = match address {
+                    SocketAddr::V4(socketaddrv4) => IpAddr::V4(*socketaddrv4.ip()),
+                    SocketAddr::V6(socketaddrv6) => IpAddr::V6(*socketaddrv6.ip()),
+                };
                 if let Some((_,beacon)) = Beacon::decode(&buffer) {
                     if beacon.id != this.id {
                         println!("beacon from {:016X} at {:?}",beacon.id,address);
@@ -132,9 +140,16 @@ impl Participant {
                                     let mut pubstate = publisher.state.lock().expect("cannot lock publisher");
                                     if !pubstate.subscribers.contains_key(id) {
                                         println!("        new subscriber for publisher {:016X}",publisher.id);
+                                        let port = match subscriber.address {
+                                            SocketAddr::V4(socketaddrv4) => socketaddrv4.port(),
+                                            SocketAddr::V6(socketaddrv6) => socketaddrv6.port(),
+                                        };
                                         pubstate.subscribers.insert(*id,SubscriberRef {
                                             alive: MAX_ALIVE,
-                                            address: subscriber.address,
+                                            address: match ip {
+                                                IpAddr::V4(ipv4) => SocketAddr::V4(SocketAddrV4::new(ipv4,port)),
+                                                IpAddr::V6(ipv6) => SocketAddr::V6(SocketAddrV6::new(ipv6,port,0,0)),
+                                            },
                                         });
                                     }
                                     else {
