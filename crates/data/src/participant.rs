@@ -22,6 +22,11 @@ use {
     },
 };
 
+pub struct LocalPubRef {
+    pub stream: io::WriteHalf<net::TcpStream>,
+    pub topic: String,
+}
+
 pub struct PeerRef {
     pub stream: io::WriteHalf<net::TcpStream>,
     pub pubs: HashMap<PubId,PubRef>,
@@ -30,7 +35,7 @@ pub struct PeerRef {
 
 pub struct ParticipantState {
     pub peers: HashMap<PeerId,PeerRef>,
-    pub pubs: HashMap<PubId,PubRef>,
+    pub pubs: HashMap<PubId,LocalPubRef>,
     pub subs: HashMap<SubId,SubRef>,
 }
 
@@ -215,16 +220,12 @@ impl Participant {
         }
     }
 
-    async fn run_publisher(self: &Arc<Participant>,mut stream: net::TcpStream,id: PubId,publisher: PubRef) {
+    async fn run_publisher(self: &Arc<Participant>,stream: net::TcpStream,id: PubId,publisher: PubRef) {
 
         // This task runs communication with the local publisher (currently no traffic).
 
-        // create local publisher reference
-        {
-            let mut state = self.state.lock().await;
-            println!("new local publisher {:016X}",id);
-            state.pubs.insert(id,publisher.clone());
-        }
+        // split stream read and write ends
+        let (mut stream_read,mut stream_write) = io::split(stream);
 
         // initialize local publisher
         let mut subs = HashMap::<SubId,SubRef>::new();
@@ -241,7 +242,7 @@ impl Participant {
                 }
             }
         }
-        send_message(&mut stream,PartToPub::Init(subs)).await;
+        send_message(&mut stream_write,PartToPub::Init(subs)).await;
 
         // inform all peers of new publisher
         {
@@ -251,9 +252,26 @@ impl Participant {
             }
         }
 
+        // create local publisher reference
+        {
+            let mut state = self.state.lock().await;
+            println!("new local publisher {:016X}",id);
+            state.pubs.insert(id,LocalPubRef {
+                stream: stream_write,
+                topic: publisher.topic.clone(),
+            });
+        }
+
         // wait for connection to break
         let mut buffer = vec![0u8; 65536];
-        while let Ok(_) = stream.read(&mut buffer).await { }
+        while let Ok(_) = stream_read.read(&mut buffer).await { }
+
+        // destroy local publisher reference
+        {
+            let mut state = self.state.lock().await;
+            println!("local publisher {:016X} lost",id);
+            state.pubs.remove(&id);
+        }
 
         // inform all peers that publisher is lost
         {
@@ -262,13 +280,6 @@ impl Participant {
                 send_message(&mut peer.stream,PeerToPeer::DropPub(id)).await;
             }
         }
-
-        // destroy local publisher reference
-        {
-            let mut state = self.state.lock().await;
-            println!("local publisher {:016X} lost",id);
-            state.pubs.remove(&id);
-        }
     }
 
     async fn run_subscriber(self: &Arc<Participant>,mut stream: net::TcpStream,id: SubId,subscriber: SubRef) {
@@ -276,30 +287,58 @@ impl Participant {
         // initialize local subscriber
         send_message(&mut stream,PartToSub::Init).await;
 
+        // inform relevant local publishers of new subscriber
+        {
+            let mut state = self.state.lock().await;
+            for (_,p) in &mut state.pubs {
+                if p.topic == subscriber.topic {
+                    send_message(&mut p.stream,PeerToPeer::NewSub(id,subscriber.clone())).await;
+                }
+            }
+        }
+
+        // inform all peers of new subscriber
+        {
+            let mut state = self.state.lock().await;
+            for (_,peer) in &mut state.peers {
+                send_message(&mut peer.stream,PeerToPeer::NewSub(id,subscriber.clone())).await;
+            }
+        }
+
         // create local subscriber reference
         {
             let mut state = self.state.lock().await;
             println!("new local subscriber {:016X}",id);
-            state.subs.insert(id,subscriber);
+            state.subs.insert(id,subscriber.clone());
         }
-
-        // TODO: matching publishers: PartToPub::NewSub
-
-        // TODO: PeerToPeer::NewSub
 
         // wait for connection to break
         let mut buffer = vec![0u8; 65536];
         while let Ok(_) = stream.read(&mut buffer).await { }
-
-        // TODO: PeerToPeer::DropSub
-
-        // TODO: matching publishers: PartToPub::DropSub
 
         // destroy local subscriber reference
         {
             let mut state = self.state.lock().await;
             println!("local subscriber {:016X} lost",id);
             state.subs.remove(&id);
+        }
+
+        // inform all peers that subscriber is lost
+        {
+            let mut state = self.state.lock().await;
+            for (_,peer) in &mut state.peers {
+                send_message(&mut peer.stream,PeerToPeer::DropSub(id)).await;
+            }
+        }
+
+        // inform relevant local publishers that subscriber is lost
+        {
+            let mut state = self.state.lock().await;
+            for (_,p) in &mut state.pubs {
+                if p.topic == subscriber.topic {
+                    send_message(&mut p.stream,PeerToPeer::DropSub(id)).await;
+                }
+            }
         }
     }
 
@@ -322,9 +361,15 @@ impl Participant {
         // send announcement to passive side
         let message = {
             let state = self.state.lock().await;
+            let mut pubs = HashMap::<PubId,PubRef>::new();
+            for (id,p) in &state.pubs {
+                pubs.insert(*id,PubRef {
+                    topic: p.topic.clone(),
+                });
+            }
             PeerAnnounce {
                 id: self.id,
-                pubs: state.pubs.clone(),
+                pubs: pubs,
                 subs: state.subs.clone(),
             }
         };
@@ -396,9 +441,15 @@ impl Participant {
                 // send response to active side
                 let message = {
                     let state = self.state.lock().await;
+                    let mut pubs = HashMap::<PubId,PubRef>::new();
+                    for (id,p) in &state.pubs {
+                        pubs.insert(*id,PubRef {
+                            topic: p.topic.clone(),
+                        });
+                    }
                     PeerAnnounce {
                         id: self.id,
-                        pubs: state.pubs.clone(),
+                        pubs: pubs,
                         subs: state.subs.clone(),
                     }
                 };
