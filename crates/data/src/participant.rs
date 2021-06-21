@@ -101,6 +101,8 @@ pub struct Participant {
 impl Participant {
     pub async fn new() -> Arc<Participant> {
 
+        println!("Participant::new");
+        
         // new ID
         let id = rand::random::<u64>();
 
@@ -119,25 +121,31 @@ impl Participant {
             }),
         });
 
+        println!("created participant {:016X} at port {}",id,port);
+
         // spawn beacon broadcaster
+        println!("spawning beacon broadcaster");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_beacon_broadcaster().await;
         });
 
         // spawn beacon receiver
+        println!("spawning beacon receiver");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_beacon_receiver().await;
         });
 
         // spawn peer listener
+        println!("spawning peer listener");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_participant_listener(part_listener).await;
         });
 
         // spawn local listener
+        println!("spawning local listener");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_local_listener().await;
@@ -403,7 +411,7 @@ impl Participant {
     async fn run_passive_peer(self: &Arc<Participant>,stream: net::TcpStream) {
 
         println!("passively service peer at {}",stream.peer_addr().unwrap());
-        
+
         // This task handles communication with a peer from the passive side.
 
         let mut buffer = vec![0u8; 65536];

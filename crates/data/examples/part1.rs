@@ -9,8 +9,10 @@ use {
 
 async fn async_main() {
 
+    println!("async_main");
+
     // create participant
-    let _participant = Participant::new();
+    let participant = Participant::new().await;
 
     // wait forever
     loop {
