@@ -102,7 +102,7 @@ impl Participant {
     pub async fn new() -> Arc<Participant> {
 
         println!("Participant::new");
-        
+
         // new ID
         let id = rand::random::<u64>();
 
@@ -163,8 +163,6 @@ impl Participant {
 
         loop {
 
-            println!("broadcasting beacon ({:016X})",self.id);
-
             // broadcast beacon
             let beacon = Beacon {
                 id: self.id,
@@ -200,8 +198,6 @@ impl Participant {
                 // if this is not a local echo
                 if beacon.id != self.id {
 
-                    println!("received beacon from {:016X}",beacon.id);
-
                     // if peer not already known, and port number strict higher
                     if {
                         let state = self.state.lock().expect("cannot lock participant");
@@ -212,8 +208,6 @@ impl Participant {
                             false
                         }
                     } {
-                        println!("spawning active peer connection");
-
                         // connect to this peer
                         let address = SocketAddr::new(address.ip(),beacon.port);
                         let stream = net::TcpStream::connect(address).await.expect("cannot connect to remote participant");
@@ -372,6 +366,7 @@ impl Participant {
         };
 
         // send announcement to passive side
+        println!("sending announcement to passive peer");
         let message = {
             let state = self.state.lock().expect("cannot lock participant");
             PeerAnnounce {
@@ -387,6 +382,8 @@ impl Participant {
         if let Ok(_) = stream_read.read(&mut buffer).await {
             if let Some((_,message)) = PeerAnnounce::decode(&buffer) {
 
+                println!("got response from passive peer");
+
                 peer.pubs = message.pubs;
                 peer.subs = message.subs;
 
@@ -397,6 +394,7 @@ impl Participant {
                 }
 
                 // handle rest of the messages
+                println!("servicing peer...");
                 self.run_peer(stream_read,peer_id).await;
 
                 // remove peer reference
@@ -423,6 +421,8 @@ impl Participant {
         if let Ok(_) = stream_read.read(&mut buffer).await {
             if let Some((_,message)) = PeerAnnounce::decode(&buffer) {
 
+                println!("got announcement from active peer");
+
                 // store new peer ID
                 let peer_id = message.id;
 
@@ -433,7 +433,8 @@ impl Participant {
                     subs: message.subs,
                 };
 
-                // send announcement to active side
+                // send response to active side
+                println!("sending response to active peer");
                 let message = {
                     let state = self.state.lock().expect("cannot lock participant");
                     PeerAnnounce {
@@ -452,6 +453,7 @@ impl Participant {
                 }
 
                 // handle rest of the messages
+                println!("servicing peer...");
                 self.run_peer(stream_read,peer_id).await;
 
                 // remove peer reference
