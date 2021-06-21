@@ -29,6 +29,8 @@ impl Publisher {
         // new ID
         let id = rand::random::<u64>();
 
+        println!("starting publisher {:016X}",id);
+
         // connect to participant
         let mut stream = net::TcpStream::connect("0.0.0.0:7332").await.expect("cannot connect to participant");
 
@@ -37,12 +39,12 @@ impl Publisher {
         let address = socket.local_addr().expect("cannot get local address of socket");
 
         // announce publisher to participant
-        let mut buffer = vec![0u8; 65536];
+        let mut send_buffer = Vec::new();
         let message = ToPart::InitPub(id,PubRef {
             topic: topic.to_string(),
         });
-        message.encode(&mut buffer);
-        stream.write_all(&buffer).await.expect("cannot send InitPub");    
+        message.encode(&mut send_buffer);
+        stream.write_all(&send_buffer).await.expect("cannot send InitPub");    
 
         // create publisher
         let publisher = Arc::new(Publisher {

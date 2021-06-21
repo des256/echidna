@@ -95,6 +95,7 @@ pub struct ParticipantState {
 pub struct Participant {
     pub id: PeerId,
     pub port: u16,
+    pub listener: net::TcpListener,
     pub state: Mutex<ParticipantState>,
 }
 
@@ -108,10 +109,14 @@ impl Participant {
         let part_listener = net::TcpListener::bind("0.0.0.0:0").await.expect("cannot bind participant listener socket");
         let port = part_listener.local_addr().expect("cannot obtain local address of participant listener socket").port();
 
+        // create pub/sub listener
+        let listener = net::TcpListener::bind("0.0.0.0:7332").await.expect("cannot bind local listener socket");
+
         // new participant
         let participant = Arc::new(Participant {
             id: id,
             port: port,
+            listener: listener,
             state: Mutex::new(ParticipantState {
                 peers: HashMap::new(),
                 pubs: HashMap::new(),
@@ -244,13 +249,10 @@ impl Participant {
 
         // This task services incoming subscriber and publisher connections from other local processes.
 
-        // create listener
-        let listener = net::TcpListener::bind("0.0.0.0:7332").await.expect("cannot bind local listener socket");
-
         loop {
 
             // accept the connection
-            let (mut stream,address) = listener.accept().await.expect("cannot accept connection from local endpoint");
+            let (mut stream,address) = self.listener.accept().await.expect("cannot accept connection from local endpoint");
 
             println!("incoming local connection from {}",address);
 
@@ -261,11 +263,16 @@ impl Participant {
                 let mut buffer = vec![0u8; 65536];
 
                 // read first message, should be ToPart::InitPub or ToPart::InitSub
-                if let Ok(_) = stream.read(&mut buffer).await {
+                if let Ok(length) = stream.read(&mut buffer).await {
+                    println!("received {} bytes:",length);
+                    for i in 0..length {
+                        println!("{:02X}",buffer[i]);
+                    }
                     if let Some((_,message)) = ToPart::decode(&buffer) {
                         match message {
 
                             ToPart::InitPub(id,publisher) => {
+                                println!("received ToPart::InitPub({:016X},publisher)",id);
                                 this.run_publisher(stream,id,publisher).await;
                             },
 
@@ -290,7 +297,7 @@ impl Participant {
         // create local publisher reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");
-            println!("new local publisher {:016}",id);
+            println!("new local publisher {:016X}",id);
             state.pubs.insert(id,publisher);
         }
 
@@ -351,8 +358,6 @@ impl Participant {
 
         // This task handles communication with a peer from the active side.
 
-        let mut buffer = vec![0u8; 65536];
-
         // split stream read and write ends
         let (mut stream_read,stream_write) = io::split(stream);
 
@@ -373,12 +378,14 @@ impl Participant {
                 subs: state.subs.clone(),
             }
         };
-        message.encode(&mut buffer);
-        peer.stream.write_all(&buffer).await.expect("cannot send Announce");    
+        let mut send_buffer = Vec::<u8>::new();
+        message.encode(&mut send_buffer);
+        peer.stream.write_all(&send_buffer).await.expect("cannot send Announce");    
 
         // get counter announcement from passive side
-        if let Ok(_) = stream_read.read(&mut buffer).await {
-            if let Some((_,message)) = PeerAnnounce::decode(&buffer) {
+        let mut recv_buffer = vec![0u8; 65536];
+        if let Ok(_) = stream_read.read(&mut recv_buffer).await {
+            if let Some((_,message)) = PeerAnnounce::decode(&recv_buffer) {
 
                 println!("got response from passive peer");
 
@@ -412,14 +419,14 @@ impl Participant {
 
         // This task handles communication with a peer from the passive side.
 
-        let mut buffer = vec![0u8; 65536];
+        let mut recv_buffer = vec![0u8; 65536];
 
         // split stream read and write ends
         let (mut stream_read,stream_write) = io::split(stream);
 
         // get announcement from active side
-        if let Ok(_) = stream_read.read(&mut buffer).await {
-            if let Some((_,message)) = PeerAnnounce::decode(&buffer) {
+        if let Ok(_) = stream_read.read(&mut recv_buffer).await {
+            if let Some((_,message)) = PeerAnnounce::decode(&recv_buffer) {
 
                 println!("got announcement from active peer");
 
@@ -443,8 +450,9 @@ impl Participant {
                         subs: state.subs.clone(),
                     }
                 };
-                message.encode(&mut buffer);
-                peer.stream.write_all(&buffer).await.expect("cannot send Announce");    
+                let mut send_buffer = Vec::<u8>::new();
+                message.encode(&mut send_buffer);
+                peer.stream.write_all(&send_buffer).await.expect("cannot send Announce");    
 
                 // and make peer reference live
                 {
