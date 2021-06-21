@@ -402,6 +402,8 @@ impl Participant {
                     let mut state = self.state.lock().expect("cannot lock participant");
                     state.peers.remove(&peer_id);
                 }
+
+                println!("peer destroyed");
             }
         }
     }
@@ -461,6 +463,8 @@ impl Participant {
                     let mut state = self.state.lock().expect("cannot lock participant");
                     state.peers.remove(&peer_id);
                 }
+
+                println!("peer destroyed");
             }
         }
     }
