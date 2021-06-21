@@ -221,6 +221,13 @@ impl Participant {
 
         // This task runs communication with the local publisher (currently no traffic).
 
+        // create local publisher reference
+        {
+            let mut state = self.state.lock().expect("cannot lock participant");
+            println!("new local publisher {:016X}",id);
+            state.pubs.insert(id,publisher.clone());
+        }
+
         // initialize local publisher
         let mut subs = HashMap::<SubId,SubRef>::new();
         {
@@ -238,20 +245,25 @@ impl Participant {
         }
         send_message(&mut stream,PartToPub::Init(subs)).await;
 
-        // create local publisher reference
+        // inform all peers of new publisher
         {
             let mut state = self.state.lock().expect("cannot lock participant");
-            println!("new local publisher {:016X}",id);
-            state.pubs.insert(id,publisher);
+            for (_,peer) in &mut state.peers {
+                send_message(&mut peer.stream,PeerToPeer::NewPub(id,publisher.clone())).await;
+            }
         }
-
-        // TODO: PeerToPeer::NewPub
 
         // wait for connection to break
         let mut buffer = vec![0u8; 65536];
         while let Ok(_) = stream.read(&mut buffer).await { }
 
-        // TODO: PeerToPeer::DropPub
+        // inform all peers that publisher is lost
+        {
+            let mut state = self.state.lock().expect("cannot lock participant");
+            for (_,peer) in &mut state.peers {
+                send_message(&mut peer.stream,PeerToPeer::DropPub(id)).await;
+            }
+        }
 
         // destroy local publisher reference
         {
@@ -265,7 +277,7 @@ impl Participant {
 
         // initialize local subscriber
         send_message(&mut stream,PartToSub::Init).await;
-        
+
         // create local subscriber reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");
@@ -273,11 +285,9 @@ impl Participant {
             state.subs.insert(id,subscriber);
         }
 
-        // TODO: PartToSub::Init
+        // TODO: matching publishers: PartToPub::NewSub
 
         // TODO: PeerToPeer::NewSub
-
-        // TODO: matching publishers: PartToPub::NewSub
 
         // wait for connection to break
         let mut buffer = vec![0u8; 65536];
