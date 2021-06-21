@@ -447,6 +447,7 @@ impl Participant {
 
                     // peer has new publisher
                     PeerToPeer::NewPub(id,publisher) => {
+                        println!("NewPub");
                         let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.insert(id,publisher);
@@ -454,6 +455,7 @@ impl Participant {
 
                     // peer lost publisher
                     PeerToPeer::DropPub(id) => {
+                        println!("DropPub");
                         let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.remove(&id);
@@ -461,6 +463,7 @@ impl Participant {
 
                     // peer has new subscriber
                     PeerToPeer::NewSub(id,subscriber) => {
+                        println!("NewSub");
                         let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.insert(id,subscriber);
@@ -469,6 +472,7 @@ impl Participant {
 
                     // peer lost subscriber
                     PeerToPeer::DropSub(id) => {
+                        println!("DropSub");
                         let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.remove(&id);
