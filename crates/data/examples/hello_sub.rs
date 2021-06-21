@@ -1,4 +1,5 @@
 use {
+    data::*,
     tokio::{
         runtime,
         time,
@@ -22,17 +23,16 @@ fn on_message(buffer: &[u8]) {
 
 async fn async_main() {
 
-    // create participant
-    let participant = Participant::new();
+    // create participant (this can be another process, but for now start it here)
+    let _participant = Participant::new();
 
-    /*// create and register hello subscriber
-    let subscriber = Subscriber::new("/hello".to_string(),on_message).await;
-    participant.register_subscriber(&subscriber);
+    // create and register hello subscriber
+    let _subscriber = Subscriber::new("/hello",on_message).await;
 
     // wait forever
     loop {
         time::sleep(Duration::from_secs(10)).await;
-    }*/
+    }
 }
 
 fn main() {

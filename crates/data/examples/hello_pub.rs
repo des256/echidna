@@ -1,4 +1,5 @@
 use {
+    data::*,
     tokio::{
         runtime,
         time,
@@ -10,36 +11,31 @@ use {
     },
     std::{
         sync::Arc,
-        time::{
-            Instant,
-            Duration,
-        },
+        time::Duration,
     },
 };
 
 async fn async_main() {
 
-    // create participant
-    let participant = Participant::new();
+    // create participant (this can be another process, but for now start it here)
+    let _participant = Participant::new();
 
-    /*// create and register hello publisher
-    let publisher = Publisher::new("/hello".to_string()).await.expect("cannot create publisher");
-    participant.register_publisher(&publisher);
+    // create hello publisher
+    let publisher = Publisher::new("/hello").await;
 
     // prepare message (string for now)
-    let message = "This message is published across UDP.".to_string();
+    let message = "This message is really awesome!".to_string();
     let mut buffer = Vec::<u8>::new();
     message.encode(&mut buffer);
     let buffer = Arc::new(buffer);
 
     // publish message every 5 seconds
-    let mut next_time = Instant::now();
     loop {
         println!("sending message: {}",message);
-        publisher.send(Arc::clone(&buffer)).await;
+        publisher.send(&buffer).await;
         
         time::sleep(Duration::from_secs(5)).await;
-    }*/
+    }
 }
 
 fn main() {

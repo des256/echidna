@@ -24,9 +24,9 @@ use {
     },
 };
 
-type PeerId = u64;
-type PubId = u64;
-type SubId = u64;
+pub type PeerId = u64;
+pub type PubId = u64;
+pub type SubId = u64;
 
 #[derive(Codec)]
 pub struct Beacon {
@@ -100,8 +100,6 @@ pub struct Participant {
 
 impl Participant {
     pub async fn new() -> Arc<Participant> {
-
-        println!("Participant::new");
 
         // new ID
         let id = rand::random::<u64>();
@@ -473,7 +471,12 @@ impl Participant {
 
         let mut buffer = vec![0u8; 65536];
 
-        while let Ok(_) = stream.read(&mut buffer).await {
+        println!("while stream.read ...");
+
+        while let Ok(length) = stream.read(&mut buffer).await {
+            if length == 0 {
+                break;
+            }
             if let Some((_,message)) = PeerToPeer::decode(&buffer) {
                 match message {
 
@@ -509,5 +512,7 @@ impl Participant {
                 }
             }
         }
+
+        println!("Closed");
     }
 }

@@ -12,7 +12,7 @@ async fn async_main() {
     println!("async_main");
 
     // create participant
-    let participant = Participant::new().await;
+    let _participant = Participant::new().await;
 
     // wait forever
     loop {
