@@ -46,6 +46,8 @@ pub struct Participant {
 impl Participant {
     pub async fn new() -> Arc<Participant> {
 
+        println!("starting participant...");
+
         // new ID
         let id = rand::random::<u64>();
 
@@ -207,16 +209,11 @@ impl Participant {
                 let mut buffer = vec![0u8; 65536];
 
                 // read first message, should be ToPart::InitPub or ToPart::InitSub
-                if let Ok(length) = stream.read(&mut buffer).await {
-                    println!("received {} bytes:",length);
-                    for i in 0..length {
-                        println!("{:02X}",buffer[i]);
-                    }
+                if let Ok(_) = stream.read(&mut buffer).await {
                     if let Some((_,message)) = ToPart::decode(&buffer) {
                         match message {
 
                             ToPart::InitPub(id,publisher) => {
-                                println!("received ToPart::InitPub({:016X},publisher)",id);
                                 this.run_publisher(stream,id,publisher).await;
                             },
 
