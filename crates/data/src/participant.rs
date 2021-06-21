@@ -155,6 +155,8 @@ impl Participant {
 
         loop {
 
+            println!("broadcasting beacon ({:016X})",self.id);
+
             // broadcast beacon
             let beacon = Beacon {
                 id: self.id,
@@ -190,6 +192,8 @@ impl Participant {
                 // if this is not a local echo
                 if beacon.id != self.id {
 
+                    println!("received beacon from {:016X}",beacon.id);
+
                     // if peer not already known, and port number strict higher
                     if {
                         let state = self.state.lock().expect("cannot lock participant");
@@ -200,6 +204,8 @@ impl Participant {
                             false
                         }
                     } {
+                        println!("spawning active peer connection");
+
                         // connect to this peer
                         let address = SocketAddr::new(address.ip(),beacon.port);
                         let stream = net::TcpStream::connect(address).await.expect("cannot connect to remote participant");
@@ -222,7 +228,9 @@ impl Participant {
         loop {
 
             // accept connection request
-            let (stream,_) = listener.accept().await.expect("cannot accept connection from remote participant");
+            let (stream,address) = listener.accept().await.expect("cannot accept connection from remote participant");
+
+            println!("incoming peer connection from {}",address);
 
             // spawn passive peer connection
             let this = Arc::clone(&self);
@@ -242,7 +250,9 @@ impl Participant {
         loop {
 
             // accept the connection
-            let (mut stream,_) = listener.accept().await.expect("cannot accept connection from local endpoint");
+            let (mut stream,address) = listener.accept().await.expect("cannot accept connection from local endpoint");
+
+            println!("incoming local connection from {}",address);
 
             // spawn local 
             let this = Arc::clone(&self);
@@ -270,6 +280,8 @@ impl Participant {
     }
 
     async fn run_publisher(self: &Arc<Participant>,mut stream: net::TcpStream,id: PubId,publisher: PubRef) {
+
+        println!("service local publisher at {}",stream.peer_addr().unwrap());
 
         // This task runs communication with the local publisher (currently no traffic).
 
@@ -300,6 +312,8 @@ impl Participant {
     }
 
     async fn run_subscriber(self: &Arc<Participant>,mut stream: net::TcpStream,id: SubId,subscriber: SubRef) {
+
+        println!("service local subscriber at {}",stream.peer_addr().unwrap());
 
         let mut buffer = vec![0u8; 65536];
 
@@ -332,6 +346,8 @@ impl Participant {
     }
 
     async fn run_active_peer(self: &Arc<Participant>,stream: net::TcpStream,peer_id: PeerId) {
+
+        println!("actively service peer at {}",stream.peer_addr().unwrap());
 
         // This task handles communication with a peer from the active side.
 
@@ -386,6 +402,8 @@ impl Participant {
 
     async fn run_passive_peer(self: &Arc<Participant>,stream: net::TcpStream) {
 
+        println!("passively service peer at {}",stream.peer_addr().unwrap());
+        
         // This task handles communication with a peer from the passive side.
 
         let mut buffer = vec![0u8; 65536];
