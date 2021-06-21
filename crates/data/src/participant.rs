@@ -251,7 +251,7 @@ impl Participant {
         // create local subscriber reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");
-            println!("new local subscriber {:016}",id);
+            println!("new local subscriber {:016X}",id);
             state.subs.insert(id,subscriber);
         }
 
