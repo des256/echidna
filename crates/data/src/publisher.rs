@@ -2,19 +2,32 @@
 
 use {
     crate::*,
-    tokio::net,
+    codec::Codec,
+    tokio::{
+        net,
+        task,
+        io::AsyncReadExt,
+    },
     std::{
-        sync::Arc,
+        sync::{
+            Arc,
+            Mutex,
+        },
         net::SocketAddr,
+        collections::HashMap,
     },
 };
+
+pub struct PublisherState {
+    pub subs: HashMap<SubId,SubRef>,
+}
 
 pub struct Publisher {
     pub id: PubId,
     pub topic: String,
-    pub stream: net::TcpStream,
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
+    pub state: Mutex<PublisherState>,
 }
 
 impl Publisher {
@@ -41,12 +54,40 @@ impl Publisher {
         let publisher = Arc::new(Publisher {
             id: id,
             topic: topic.to_string(),
-            stream: stream,
             socket: socket,
             address: address,
+            state: Mutex::new(PublisherState {
+                subs: HashMap::new(),
+            }),
         });
 
+        // spawn participant receiver
+        let this = Arc::clone(&publisher);
+        task::spawn(async move {
+            this.run_participant_receiver(stream).await;
+        });
+        
         publisher
+    }
+
+    pub async fn run_participant_receiver(self: &Arc<Publisher>,mut stream: net::TcpStream) {
+
+        let mut recv_buffer = vec![0u8; 65536];
+
+        // receive participant messages
+        while let Ok(_) = stream.read(&mut recv_buffer).await {
+            if let Some((_,message)) = PartToPub::decode(&recv_buffer) {
+                match message {
+                    PartToPub::Init(subs) => {
+                        let mut state = self.state.lock().expect("cannot lock publisher");
+                        state.subs = subs;
+                    },
+                    _ => {
+                        println!("TODO: some other message...");
+                    },
+                }
+            }
+        }
     }
 
     pub async fn send(self: &Arc<Publisher>,_data: &[u8]) {

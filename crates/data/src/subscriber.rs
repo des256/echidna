@@ -4,6 +4,8 @@ use {
     crate::*,
     tokio::{
         net,
+        task,
+        io::AsyncReadExt,
         io::AsyncWriteExt,
     },
     codec::Codec,
@@ -16,7 +18,6 @@ use {
 pub struct Subscriber {
     pub id: PubId,
     pub topic: String,
-    pub stream: net::TcpStream,
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
 }
@@ -47,11 +48,35 @@ impl Subscriber {
         let subscriber = Arc::new(Subscriber {
             id: id,
             topic: topic.to_string(),
-            stream: stream,
             socket: socket,
             address: address,
         });
 
+        // spawn participant receiver
+        let this = Arc::clone(&subscriber);
+        task::spawn(async move {
+            this.run_participant_receiver(stream).await;
+        });
+
         subscriber
+    }
+
+    pub async fn run_participant_receiver(self: &Arc<Subscriber>,mut stream: net::TcpStream) {
+
+        let mut recv_buffer = vec![0u8; 65536];
+
+        // receive participant messages
+        while let Ok(_) = stream.read(&mut recv_buffer).await {
+            if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
+                match message {
+                    PartToSub::Init => {
+                        println!("participant accepts init");
+                    },
+                    _ => {
+                        println!("TODO: some other message...");
+                    },
+                }
+            }
+        }
     }
 }

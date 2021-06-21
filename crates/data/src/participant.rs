@@ -228,8 +228,6 @@ impl Participant {
             state.pubs.insert(id,publisher);
         }
 
-        // TODO: PartToPub::Init
-
         // TODO: PeerToPeer::NewPub
 
         // wait for connection to break
