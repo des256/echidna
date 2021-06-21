@@ -221,6 +221,23 @@ impl Participant {
 
         // This task runs communication with the local publisher (currently no traffic).
 
+        // initialize local publisher
+        let mut subs = HashMap::<SubId,SubRef>::new();
+        {
+            let state = self.state.lock().expect("cannot lock participant");
+            for (id,s) in &state.subs {
+                if s.topic == publisher.topic {
+                    subs.insert(*id,s.clone());
+                }
+            }
+            for (_,peer) in &state.peers {
+                for (id,s) in &peer.subs {
+                    subs.insert(*id,s.clone());
+                }
+            }
+        }
+        send_message(&mut stream,PartToPub::Init(subs)).await;
+
         // create local publisher reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");
@@ -246,6 +263,9 @@ impl Participant {
 
     async fn run_subscriber(self: &Arc<Participant>,mut stream: net::TcpStream,id: SubId,subscriber: SubRef) {
 
+        // initialize local subscriber
+        send_message(&mut stream,PartToSub::Init).await;
+        
         // create local subscriber reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");

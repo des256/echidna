@@ -37,7 +37,7 @@ impl Subscriber {
 
         // announce subscriber to participant
         let message = ToPart::InitSub(id,SubRef {
-            port: address.port(),
+            address: address,
             topic: topic.to_string(),
         });
         let mut send_buffer = Vec::<u8>::new();
@@ -70,7 +70,7 @@ impl Subscriber {
             if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
                 match message {
                     PartToSub::Init => {
-                        println!("participant accepts init");
+                        println!("subscriber initialized");
                     },
                     _ => {
                         println!("TODO: some other message...");

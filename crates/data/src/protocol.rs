@@ -8,6 +8,7 @@ use {
     codec::Codec,
     std::{
         collections::HashMap,
+        net::SocketAddr,
     },
 };
 
@@ -28,7 +29,7 @@ pub struct PubRef {
 
 #[derive(Clone,Codec)]
 pub struct SubRef {
-    pub port: u16,
+    pub address: SocketAddr,
     pub topic: String,
 }
 

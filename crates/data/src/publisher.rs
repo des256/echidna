@@ -81,6 +81,10 @@ impl Publisher {
                     PartToPub::Init(subs) => {
                         let mut state = self.state.lock().expect("cannot lock publisher");
                         state.subs = subs;
+                        println!("publisher initialized:");
+                        for (id,s) in &state.subs {
+                            println!("    subscriber {:016X} at {} for topic \"{}\"",id,s.address,s.topic);
+                        }
                     },
                     _ => {
                         println!("TODO: some other message...");
