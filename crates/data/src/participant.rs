@@ -46,8 +46,6 @@ pub struct Participant {
 impl Participant {
     pub async fn new() -> Arc<Participant> {
 
-        println!("starting participant...");
-
         // new ID
         let id = rand::random::<u64>();
 
@@ -73,28 +71,24 @@ impl Participant {
         println!("created participant {:016X} at port {}",id,port);
 
         // spawn beacon broadcaster
-        println!("spawning beacon broadcaster");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_beacon_broadcaster().await;
         });
 
         // spawn beacon receiver
-        println!("spawning beacon receiver");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_beacon_receiver().await;
         });
 
         // spawn peer listener
-        println!("spawning peer listener");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_participant_listener(part_listener).await;
         });
 
         // spawn local listener
-        println!("spawning local listener");
         let this = Arc::clone(&participant);
         task::spawn(async move {
             this.run_local_listener().await;
@@ -179,9 +173,7 @@ impl Participant {
         loop {
 
             // accept connection request
-            let (stream,address) = listener.accept().await.expect("cannot accept connection from remote participant");
-
-            println!("incoming peer connection from {}",address);
+            let (stream,_) = listener.accept().await.expect("cannot accept connection from remote participant");
 
             // spawn passive peer connection
             let this = Arc::clone(&self);
@@ -198,9 +190,7 @@ impl Participant {
         loop {
 
             // accept the connection
-            let (mut stream,address) = self.listener.accept().await.expect("cannot accept connection from local endpoint");
-
-            println!("incoming local connection from {}",address);
+            let (mut stream,_) = self.listener.accept().await.expect("cannot accept connection from local endpoint");
 
             // spawn local 
             let this = Arc::clone(&self);
@@ -229,11 +219,7 @@ impl Participant {
 
     async fn run_publisher(self: &Arc<Participant>,mut stream: net::TcpStream,id: PubId,publisher: PubRef) {
 
-        println!("service local publisher at {}",stream.peer_addr().unwrap());
-
         // This task runs communication with the local publisher (currently no traffic).
-
-        let mut buffer = vec![0u8; 65536];
 
         // create local publisher reference
         {
@@ -247,6 +233,7 @@ impl Participant {
         // TODO: PeerToPeer::NewPub
 
         // wait for connection to break
+        let mut buffer = vec![0u8; 65536];
         while let Ok(_) = stream.read(&mut buffer).await { }
 
         // TODO: PeerToPeer::DropPub
@@ -254,16 +241,12 @@ impl Participant {
         // destroy local publisher reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");
-            println!("local publisher {:016X} died",id);
+            println!("local publisher {:016X} lost",id);
             state.pubs.remove(&id);
         }
     }
 
     async fn run_subscriber(self: &Arc<Participant>,mut stream: net::TcpStream,id: SubId,subscriber: SubRef) {
-
-        println!("service local subscriber at {}",stream.peer_addr().unwrap());
-
-        let mut buffer = vec![0u8; 65536];
 
         // create local subscriber reference
         {
@@ -279,6 +262,7 @@ impl Participant {
         // TODO: matching publishers: PartToPub::NewSub
 
         // wait for connection to break
+        let mut buffer = vec![0u8; 65536];
         while let Ok(_) = stream.read(&mut buffer).await { }
 
         // TODO: PeerToPeer::DropSub
@@ -288,16 +272,16 @@ impl Participant {
         // destroy local subscriber reference
         {
             let mut state = self.state.lock().expect("cannot lock participant");
-            println!("local subscriber {:016X} died",id);
+            println!("local subscriber {:016X} lost",id);
             state.subs.remove(&id);
         }
     }
 
     async fn run_active_peer(self: &Arc<Participant>,stream: net::TcpStream,peer_id: PeerId) {
 
-        println!("actively service peer at {}",stream.peer_addr().unwrap());
-
         // This task handles communication with a peer from the active side.
+
+        let address = stream.peer_addr().unwrap();
 
         // split stream read and write ends
         let (mut stream_read,stream_write) = io::split(stream);
@@ -310,7 +294,6 @@ impl Participant {
         };
 
         // send announcement to passive side
-        println!("sending announcement to passive peer");
         let message = {
             let state = self.state.lock().expect("cannot lock participant");
             PeerAnnounce {
@@ -326,8 +309,6 @@ impl Participant {
         if let Ok(_) = stream_read.read(&mut recv_buffer).await {
             if let Some((_,message)) = PeerAnnounce::decode(&recv_buffer) {
 
-                println!("got response from passive peer");
-
                 peer.pubs = message.pubs;
                 peer.subs = message.subs;
 
@@ -338,36 +319,32 @@ impl Participant {
                 }
 
                 // handle rest of the messages
-                println!("servicing peer...");
+                println!("connected to peer {:016X} at {}",peer_id,address);
                 self.run_peer(stream_read,peer_id).await;
+                println!("peer {:016X} lost",peer_id);
 
                 // remove peer reference
                 {
                     let mut state = self.state.lock().expect("cannot lock participant");
                     state.peers.remove(&peer_id);
                 }
-
-                println!("peer destroyed");
             }
         }
     }
 
     async fn run_passive_peer(self: &Arc<Participant>,stream: net::TcpStream) {
 
-        println!("passively service peer at {}",stream.peer_addr().unwrap());
-
         // This task handles communication with a peer from the passive side.
 
-        let mut recv_buffer = vec![0u8; 65536];
+        let address = stream.peer_addr().unwrap();
 
         // split stream read and write ends
         let (mut stream_read,stream_write) = io::split(stream);
 
         // get announcement from active side
+        let mut recv_buffer = vec![0u8; 65536];
         if let Ok(_) = stream_read.read(&mut recv_buffer).await {
             if let Some((_,message)) = PeerAnnounce::decode(&recv_buffer) {
-
-                println!("got announcement from active peer");
 
                 // store new peer ID
                 let peer_id = message.id;
@@ -380,7 +357,6 @@ impl Participant {
                 };
 
                 // send response to active side
-                println!("sending response to active peer");
                 let message = {
                     let state = self.state.lock().expect("cannot lock participant");
                     PeerAnnounce {
@@ -398,16 +374,15 @@ impl Participant {
                 }
 
                 // handle rest of the messages
-                println!("servicing peer...");
+                println!("connected to peer {:016X} at {}",peer_id,address);
                 self.run_peer(stream_read,peer_id).await;
+                println!("peer {:016X} lost",peer_id);
 
                 // remove peer reference
                 {
                     let mut state = self.state.lock().expect("cannot lock participant");
                     state.peers.remove(&peer_id);
                 }
-
-                println!("peer destroyed");
             }
         }
     }
@@ -415,8 +390,6 @@ impl Participant {
     async fn run_peer(self: &Arc<Participant>,mut stream: io::ReadHalf<net::TcpStream>,peer_id: PeerId) {
 
         let mut buffer = vec![0u8; 65536];
-
-        println!("while stream.read ...");
 
         while let Ok(length) = stream.read(&mut buffer).await {
             if length == 0 {
@@ -457,7 +430,5 @@ impl Participant {
                 }
             }
         }
-
-        println!("Closed");
     }
 }
