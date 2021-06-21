@@ -320,6 +320,17 @@ impl Participant {
 
                 // handle rest of the messages
                 println!("connected to peer {:016X} at {}",peer_id,address);
+                {
+                    let state = self.state.lock().expect("cannot lock participant");
+                    let peer = state.peers.get(&peer_id).unwrap();
+                    for (id,p) in &peer.pubs {
+                        println!("    publisher {:016X} for \"{}\"",id,p.topic);
+                    }
+                    for (id,s) in &peer.subs {
+                        println!("    subscriber {:016X} for \"{}\"",id,s.topic);
+                    }
+                }
+
                 self.run_peer(stream_read,peer_id).await;
                 println!("peer {:016X} lost",peer_id);
 
@@ -375,6 +386,16 @@ impl Participant {
 
                 // handle rest of the messages
                 println!("connected to peer {:016X} at {}",peer_id,address);
+                {
+                    let state = self.state.lock().expect("cannot lock participant");
+                    let peer = state.peers.get(&peer_id).unwrap();
+                    for (id,p) in &peer.pubs {
+                        println!("    publisher {:016X} for \"{}\"",id,p.topic);
+                    }
+                    for (id,s) in &peer.subs {
+                        println!("    subscriber {:016X} for \"{}\"",id,s.topic);
+                    }
+                }
                 self.run_peer(stream_read,peer_id).await;
                 println!("peer {:016X} lost",peer_id);
 
