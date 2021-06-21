@@ -1,14 +1,8 @@
 // Echidna - Data
 
-// Echidna - Data
-
 use {
     crate::*,
-    tokio::{
-        net,
-        io::AsyncWriteExt,
-    },
-    codec::Codec,
+    tokio::net,
     std::{
         sync::Arc,
         net::SocketAddr,
@@ -39,12 +33,9 @@ impl Publisher {
         let address = socket.local_addr().expect("cannot get local address of socket");
 
         // announce publisher to participant
-        let mut send_buffer = Vec::new();
-        let message = ToPart::InitPub(id,PubRef {
+        send_message(&mut stream,ToPart::InitPub(id,PubRef {
             topic: topic.to_string(),
-        });
-        message.encode(&mut send_buffer);
-        stream.write_all(&send_buffer).await.expect("cannot send InitPub");    
+        })).await;
 
         // create publisher
         let publisher = Arc::new(Publisher {

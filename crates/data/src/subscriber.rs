@@ -35,11 +35,11 @@ impl Subscriber {
         let address = socket.local_addr().expect("cannot get local address of socket");
 
         // announce subscriber to participant
-        let mut send_buffer = vec![0u8; 65536];
         let message = ToPart::InitSub(id,SubRef {
             port: address.port(),
             topic: topic.to_string(),
         });
+        let mut send_buffer = Vec::<u8>::new();
         message.encode(&mut send_buffer);
         stream.write_all(&send_buffer).await.expect("cannot send InitSub");
 

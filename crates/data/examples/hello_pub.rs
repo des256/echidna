@@ -18,7 +18,7 @@ use {
 async fn async_main() {
 
     // create participant (this can be another process, but for now start it here)
-    let _participant = Participant::new().await;
+    let _participant = Participant::new();
 
     // create hello publisher
     let publisher = Publisher::new("/hello").await;

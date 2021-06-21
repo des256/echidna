@@ -1,5 +1,8 @@
 // Echidna - Data
 
+mod protocol;
+pub use protocol::*;
+
 mod participant;
 pub use participant::*;
 

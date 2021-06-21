@@ -1,13 +1,13 @@
 // Echidna - Data
 
 use {
+    crate::*,
     tokio::{
         task,
         io,
         net,
         time,
         io::AsyncReadExt,
-        io::AsyncWriteExt,
     },
     codec::Codec,
     std::{
@@ -23,62 +23,6 @@ use {
         },
     },
 };
-
-pub type PeerId = u64;
-pub type PubId = u64;
-pub type SubId = u64;
-
-#[derive(Codec)]
-pub struct Beacon {
-    pub id: PeerId,
-    pub port: u16,
-}
-
-#[derive(Clone,Codec)]
-pub struct PubRef {
-    pub topic: String,
-}
-
-#[derive(Clone,Codec)]
-pub struct SubRef {
-    pub port: u16,
-    pub topic: String,
-}
-
-#[derive(Codec)]
-pub struct PeerAnnounce {
-    pub id: PeerId,
-    pub pubs: HashMap<PubId,PubRef>,
-    pub subs: HashMap<SubId,SubRef>,
-}
-
-#[derive(Codec)]
-pub enum PeerToPeer {
-    NewPub(PubId,PubRef),
-    DropPub(PubId),
-    NewSub(SubId,SubRef),
-    DropSub(SubId),
-}
-
-#[derive(Codec)]
-pub enum ToPart {
-    InitPub(PubId,PubRef),
-    InitSub(SubId,SubRef),
-}
-
-#[derive(Codec)]
-pub enum PartToPub {
-    Init(HashMap<SubId,SubRef>),
-    InitFailed,
-    NewSub(SubId,SubRef),
-    DropSub(SubId),
-}
-
-#[derive(Codec)]
-pub enum PartToSub {
-    Init,
-    InitFailed,
-}
 
 pub struct PeerRef {
     pub stream: io::WriteHalf<net::TcpStream>,
@@ -378,9 +322,7 @@ impl Participant {
                 subs: state.subs.clone(),
             }
         };
-        let mut send_buffer = Vec::<u8>::new();
-        message.encode(&mut send_buffer);
-        peer.stream.write_all(&send_buffer).await.expect("cannot send Announce");    
+        send_message(&mut peer.stream,message).await;
 
         // get counter announcement from passive side
         let mut recv_buffer = vec![0u8; 65536];
@@ -450,9 +392,7 @@ impl Participant {
                         subs: state.subs.clone(),
                     }
                 };
-                let mut send_buffer = Vec::<u8>::new();
-                message.encode(&mut send_buffer);
-                peer.stream.write_all(&send_buffer).await.expect("cannot send Announce");    
+                send_message(&mut peer.stream,message).await;
 
                 // and make peer reference live
                 {
