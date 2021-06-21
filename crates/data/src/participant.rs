@@ -7,15 +7,13 @@ use {
         io,
         net,
         time,
+        sync::Mutex,
         io::AsyncReadExt,
     },
     codec::Codec,
     std::{
         collections::HashMap,
-        sync::{
-            Arc,
-            Mutex,
-        },
+        sync::Arc,
         time::Duration,
         net::{
             Ipv4Addr,
@@ -143,7 +141,7 @@ impl Participant {
 
                     // if peer not already known, and port number strict higher
                     if {
-                        let state = self.state.lock().expect("cannot lock participant");
+                        let state = self.state.lock().await;
                         if let None = state.peers.get(&beacon.id) {
                             beacon.port < self.port
                         }
@@ -223,7 +221,7 @@ impl Participant {
 
         // create local publisher reference
         {
-            let mut state = self.state.lock().expect("cannot lock participant");
+            let mut state = self.state.lock().await;
             println!("new local publisher {:016X}",id);
             state.pubs.insert(id,publisher.clone());
         }
@@ -231,7 +229,7 @@ impl Participant {
         // initialize local publisher
         let mut subs = HashMap::<SubId,SubRef>::new();
         {
-            let state = self.state.lock().expect("cannot lock participant");
+            let state = self.state.lock().await;
             for (id,s) in &state.subs {
                 if s.topic == publisher.topic {
                     subs.insert(*id,s.clone());
@@ -247,7 +245,7 @@ impl Participant {
 
         // inform all peers of new publisher
         {
-            let mut state = self.state.lock().expect("cannot lock participant");
+            let mut state = self.state.lock().await;
             for (_,peer) in &mut state.peers {
                 send_message(&mut peer.stream,PeerToPeer::NewPub(id,publisher.clone())).await;
             }
@@ -259,7 +257,7 @@ impl Participant {
 
         // inform all peers that publisher is lost
         {
-            let mut state = self.state.lock().expect("cannot lock participant");
+            let mut state = self.state.lock().await;
             for (_,peer) in &mut state.peers {
                 send_message(&mut peer.stream,PeerToPeer::DropPub(id)).await;
             }
@@ -267,7 +265,7 @@ impl Participant {
 
         // destroy local publisher reference
         {
-            let mut state = self.state.lock().expect("cannot lock participant");
+            let mut state = self.state.lock().await;
             println!("local publisher {:016X} lost",id);
             state.pubs.remove(&id);
         }
@@ -280,7 +278,7 @@ impl Participant {
 
         // create local subscriber reference
         {
-            let mut state = self.state.lock().expect("cannot lock participant");
+            let mut state = self.state.lock().await;
             println!("new local subscriber {:016X}",id);
             state.subs.insert(id,subscriber);
         }
@@ -299,7 +297,7 @@ impl Participant {
 
         // destroy local subscriber reference
         {
-            let mut state = self.state.lock().expect("cannot lock participant");
+            let mut state = self.state.lock().await;
             println!("local subscriber {:016X} lost",id);
             state.subs.remove(&id);
         }
@@ -323,7 +321,7 @@ impl Participant {
 
         // send announcement to passive side
         let message = {
-            let state = self.state.lock().expect("cannot lock participant");
+            let state = self.state.lock().await;
             PeerAnnounce {
                 id: self.id,
                 pubs: state.pubs.clone(),
@@ -342,14 +340,14 @@ impl Participant {
 
                 // and make peer reference live
                 {
-                    let mut state = self.state.lock().expect("cannot lock participant");
+                    let mut state = self.state.lock().await;
                     state.peers.insert(peer_id,peer);
                 }
 
                 // handle rest of the messages
                 println!("connected to peer {:016X} at {}",peer_id,address);
                 {
-                    let state = self.state.lock().expect("cannot lock participant");
+                    let state = self.state.lock().await;
                     let peer = state.peers.get(&peer_id).unwrap();
                     for (id,p) in &peer.pubs {
                         println!("    publisher {:016X} for \"{}\"",id,p.topic);
@@ -364,7 +362,7 @@ impl Participant {
 
                 // remove peer reference
                 {
-                    let mut state = self.state.lock().expect("cannot lock participant");
+                    let mut state = self.state.lock().await;
                     state.peers.remove(&peer_id);
                 }
             }
@@ -397,7 +395,7 @@ impl Participant {
 
                 // send response to active side
                 let message = {
-                    let state = self.state.lock().expect("cannot lock participant");
+                    let state = self.state.lock().await;
                     PeerAnnounce {
                         id: self.id,
                         pubs: state.pubs.clone(),
@@ -408,14 +406,14 @@ impl Participant {
 
                 // and make peer reference live
                 {
-                    let mut state = self.state.lock().expect("cannot lock participant");
+                    let mut state = self.state.lock().await;
                     state.peers.insert(peer_id,peer);
                 }
 
                 // handle rest of the messages
                 println!("connected to peer {:016X} at {}",peer_id,address);
                 {
-                    let state = self.state.lock().expect("cannot lock participant");
+                    let state = self.state.lock().await;
                     let peer = state.peers.get(&peer_id).unwrap();
                     for (id,p) in &peer.pubs {
                         println!("    publisher {:016X} for \"{}\"",id,p.topic);
@@ -429,7 +427,7 @@ impl Participant {
 
                 // remove peer reference
                 {
-                    let mut state = self.state.lock().expect("cannot lock participant");
+                    let mut state = self.state.lock().await;
                     state.peers.remove(&peer_id);
                 }
             }
@@ -449,21 +447,21 @@ impl Participant {
 
                     // peer has new publisher
                     PeerToPeer::NewPub(id,publisher) => {
-                        let mut state = self.state.lock().expect("cannot lock participant");
+                        let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.insert(id,publisher);
                     },
 
                     // peer lost publisher
                     PeerToPeer::DropPub(id) => {
-                        let mut state = self.state.lock().expect("cannot lock participant");
+                        let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.remove(&id);
                     },
 
                     // peer has new subscriber
                     PeerToPeer::NewSub(id,subscriber) => {
-                        let mut state = self.state.lock().expect("cannot lock participant");
+                        let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.insert(id,subscriber);
                         // TODO: all local pubs with same topic: PartToPub::NewSub
@@ -471,7 +469,7 @@ impl Participant {
 
                     // peer lost subscriber
                     PeerToPeer::DropSub(id) => {
-                        let mut state = self.state.lock().expect("cannot lock participant");
+                        let mut state = self.state.lock().await;
                         let peer = state.peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.remove(&id);
                         // TODO: all local pubs with same topic: PartToPub::DropSub

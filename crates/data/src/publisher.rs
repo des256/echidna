@@ -7,12 +7,10 @@ use {
         net,
         task,
         io::AsyncReadExt,
+        sync::Mutex,
     },
     std::{
-        sync::{
-            Arc,
-            Mutex,
-        },
+        sync::Arc,
         net::SocketAddr,
         collections::HashMap,
     },
@@ -79,7 +77,7 @@ impl Publisher {
             if let Some((_,message)) = PartToPub::decode(&recv_buffer) {
                 match message {
                     PartToPub::Init(subs) => {
-                        let mut state = self.state.lock().expect("cannot lock publisher");
+                        let mut state = self.state.lock().await;
                         state.subs = subs;
                         println!("publisher initialized:");
                         for (id,s) in &state.subs {
