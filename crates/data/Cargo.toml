@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 rand = "*"
-async = { path = "../async" }
+tokio = { version = "*", features = [ "full" ] }
 codec = { path = "../codec" }

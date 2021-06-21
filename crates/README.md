@@ -14,10 +14,7 @@ Data serialization. This is essentially a simplified `serde` clone.
 
 ## async
 
-Futures, a reactor and various asynchronous versions of APIs. This is
-essentially a simplified `tokio` clone.
-
-Currently repackages `smol`, which does a very good job at this.
+- replaced by `tokio` (because of ReadHalf/WriteHalf).
 
 ## data
 

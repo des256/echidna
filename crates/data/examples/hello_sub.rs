@@ -1,12 +1,12 @@
 use {
-    r#async::{
-        block_on,
-        Timer,
+    tokio::{
+        runtime,
+        time,
     },
     codec::Codec,
     data::{
         Participant,
-        Subscriber,
+        //Subscriber,
     },
     std::time::Duration,
 };
@@ -25,16 +25,17 @@ async fn async_main() {
     // create participant
     let participant = Participant::new();
 
-    // create and register hello subscriber
+    /*// create and register hello subscriber
     let subscriber = Subscriber::new("/hello".to_string(),on_message).await;
     participant.register_subscriber(&subscriber);
 
     // wait forever
     loop {
-        Timer::after(Duration::from_secs(10)).await;
-    }
+        time::sleep(Duration::from_secs(10)).await;
+    }*/
 }
 
 fn main() {
-    block_on(async_main());
+    let runtime = runtime::Runtime::new().unwrap();
+    runtime.block_on(async_main());
 }

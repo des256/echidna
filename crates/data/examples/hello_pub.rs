@@ -1,12 +1,12 @@
 use {
-    r#async::{
-        block_on,
-        Timer,
+    tokio::{
+        runtime,
+        time,
     },
     codec::Codec,
     data::{
         Participant,
-        Publisher,
+        //Publisher,
     },
     std::{
         sync::Arc,
@@ -22,7 +22,7 @@ async fn async_main() {
     // create participant
     let participant = Participant::new();
 
-    // create and register hello publisher
+    /*// create and register hello publisher
     let publisher = Publisher::new("/hello".to_string()).await.expect("cannot create publisher");
     participant.register_publisher(&publisher);
 
@@ -38,11 +38,11 @@ async fn async_main() {
         println!("sending message: {}",message);
         publisher.send(Arc::clone(&buffer)).await;
         
-        next_time += Duration::from_secs(5);
-        Timer::at(next_time).await;
-    }
+        time::sleep(Duration::from_secs(5)).await;
+    }*/
 }
 
 fn main() {
-    block_on(async_main());
+    let runtime = runtime::Runtime::new().unwrap();
+    runtime.block_on(async_main());
 }

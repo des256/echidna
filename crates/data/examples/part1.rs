@@ -1,7 +1,7 @@
 use {
-    r#async::{
-        block_on,
-        Timer,
+    tokio::{
+        runtime,
+        time,
     },
     data::Participant,
     std::time::Duration,
@@ -14,10 +14,11 @@ async fn async_main() {
 
     // wait forever
     loop {
-        Timer::after(Duration::from_secs(10)).await;
+        time::sleep(Duration::from_secs(10)).await;
     }
 }
 
 fn main() {
-    block_on(async_main());
+    let runtime = runtime::Runtime::new().unwrap();
+    runtime.block_on(async_main());
 }

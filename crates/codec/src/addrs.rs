@@ -1,6 +1,6 @@
 use {
     crate::*,
-    r#async::net::{
+    std::net::{
         Ipv4Addr,
         Ipv6Addr,
         IpAddr,
@@ -194,7 +194,7 @@ impl Codec for SocketAddr {
 mod tests {
 
     use crate::Codec;
-    use r#async::net::{
+    use std::net::{
         Ipv4Addr,
         Ipv6Addr,
         IpAddr,
