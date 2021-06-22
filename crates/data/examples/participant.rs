@@ -8,9 +8,6 @@ use {
 };
 
 async fn async_main() {
-
-    println!("starting participant...");
-    
     let _participant = Participant::new().await;
     loop {
         time::sleep(Duration::from_secs(10)).await;

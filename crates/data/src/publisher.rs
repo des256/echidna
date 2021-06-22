@@ -67,42 +67,45 @@ impl Publisher {
         loop {
 
             // connect to participant
-            let mut stream = net::TcpStream::connect("0.0.0.0:7332").await.expect("cannot connect to participant");
+            if let Ok(mut stream) = net::TcpStream::connect("0.0.0.0:7332").await {
 
-            // announce publisher to participant
-            send_message(&mut stream,ToPart::InitPub(self.id,PubRef {
-                topic: self.topic.clone(),
-            })).await;
+                // announce publisher to participant
+                send_message(&mut stream,ToPart::InitPub(self.id,PubRef {
+                    topic: self.topic.clone(),
+                })).await;
 
-            // receive participant messages
-            let mut recv_buffer = vec![0u8; 65536];
-            while let Ok(length) = stream.read(&mut recv_buffer).await {
-                if length == 0 {
-                    break;
-                }
-                if let Some((_,message)) = PartToPub::decode(&recv_buffer) {
-                    match message {
-                        PartToPub::Init(subs) => {
-                            let mut state = self.state.lock().await;
-                            state.subs = subs;
-                            for (id,s) in state.subs.iter() {
-                                println!("new subscriber {:016X} found at {}",id,s.address);
-                            }
-                        },
-                        PartToPub::InitFailed => {
-                            panic!("publisher initialization failed!");
-                        },
-                        PartToPub::NewSub(id,subscriber) => {
-                            println!("subscriber {:016X} found at {}",id,subscriber.address);
-                        },
-                        PartToPub::DropSub(id) => {
-                            println!("subscriber {:016X} lost",id);
-                        },
+                // receive participant messages
+                let mut recv_buffer = vec![0u8; 65536];
+                while let Ok(length) = stream.read(&mut recv_buffer).await {
+                    if length == 0 {
+                        break;
+                    }
+                    if let Some((_,message)) = PartToPub::decode(&recv_buffer) {
+                        match message {
+                            PartToPub::Init(subs) => {
+                                let mut state = self.state.lock().await;
+                                state.subs = subs;
+                                for (id,s) in state.subs.iter() {
+                                    println!("new subscriber {:016X} found at {}",id,s.address);
+                                }
+                            },
+                            PartToPub::InitFailed => {
+                                panic!("publisher initialization failed!");
+                            },
+                            PartToPub::NewSub(id,subscriber) => {
+                                println!("subscriber {:016X} found at {}",id,subscriber.address);
+                            },
+                            PartToPub::DropSub(id) => {
+                                println!("subscriber {:016X} lost",id);
+                            },
+                        }
                     }
                 }
+                println!("participant lost...");
             }
-
-            println!("participant lost...");
+            else {
+                println!("could not connect to participant...");
+            }
 
             // wait for a few seconds before trying again
             time::sleep(Duration::from_secs(5)).await;

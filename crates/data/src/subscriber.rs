@@ -57,31 +57,35 @@ impl Subscriber {
         loop {
 
             // connect to participant
-            let mut stream = net::TcpStream::connect("0.0.0.0:7332").await.expect("cannot connect to participant");
+            if let Ok(mut stream) = net::TcpStream::connect("0.0.0.0:7332").await {
 
-            // announce subscriber to participant
-            send_message(&mut stream,ToPart::InitSub(self.id,SubRef {
-                address: self.address,
-                topic: self.topic.clone(),
-            })).await;
+                // announce subscriber to participant
+                send_message(&mut stream,ToPart::InitSub(self.id,SubRef {
+                    address: self.address,
+                    topic: self.topic.clone(),
+                })).await;
 
-            // receive participant messages
-            let mut recv_buffer = vec![0u8; 65536];
-            while let Ok(length) = stream.read(&mut recv_buffer).await {
-                if length == 0 {
-                    break;
-                }
-                if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
-                    match message {
-                        PartToSub::Init => { },
-                        PartToSub::InitFailed => {
-                            panic!("publisher initialization failed!");
-                        },
+                // receive participant messages
+                let mut recv_buffer = vec![0u8; 65536];
+                while let Ok(length) = stream.read(&mut recv_buffer).await {
+                    if length == 0 {
+                        break;
+                    }
+                    if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
+                        match message {
+                            PartToSub::Init => { },
+                            PartToSub::InitFailed => {
+                                panic!("publisher initialization failed!");
+                            },
+                        }
                     }
                 }
-            }
 
-            println!("participant lost...");
+                println!("participant lost...");
+            }
+            else {
+                println!("could not connect to participant...");
+            }
 
             // wait for a few seconds before trying again
             time::sleep(Duration::from_secs(5)).await;
