@@ -246,7 +246,10 @@ impl Participant {
             let state_peers = self.peers.lock().await;
             for (_,peer) in state_peers.iter() {
                 for (id,s) in &peer.subs {
-                    subs.insert(*id,s.clone());
+                    subs.insert(*id,SubRef {
+                        address: SocketAddr::new(peer.ip,s.address.port()),
+                        topic: s.topic.clone(),
+                    });
                 }
             }
         }
