@@ -91,7 +91,7 @@ impl Publisher {
                         println!("new subscriber {:016X} at {}",id,subscriber.address);
                     },
                     PartToPub::DropSub(id) => {
-                        println!("subscriber {:016X} lost",id);
+                        println!("lost subscriber {:016X}",id);
                     },
                 }
             }

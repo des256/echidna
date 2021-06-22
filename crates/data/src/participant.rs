@@ -410,7 +410,12 @@ impl Participant {
             if let Some((_,message)) = PeerAnnounce::decode(&recv_buffer) {
 
                 peer.pubs = message.pubs;
-                peer.subs = message.subs;
+                for (id,s) in message.subs.iter() {
+                    peer.subs.insert(*id,SubRef {
+                        address: SocketAddr::new(address.ip(),s.address.port()),
+                        topic: s.topic.clone(),
+                    });
+                }
 
                 // and make peer reference live
                 {
@@ -426,7 +431,7 @@ impl Participant {
                         println!("    publisher {:016X} for \"{}\"",id,p.topic);
                     }
                     for (id,s) in &peer.subs {
-                        println!("    subscriber {:016X} for \"{}\"",id,s.topic);
+                        println!("    subscriber {:016X} for \"{}\" at {}",id,s.topic,s.address);
                     }
                 }
 
@@ -492,8 +497,14 @@ impl Participant {
                 let mut peer = PeerRef {
                     stream: stream_write,
                     pubs: message.pubs,
-                    subs: message.subs,
+                    subs: HashMap::new(),
                 };
+                for (id,s) in message.subs.iter() {
+                    peer.subs.insert(*id,SubRef {
+                        address: SocketAddr::new(address.ip(),s.address.port()),
+                        topic: s.topic.clone(),
+                    });
+                }
 
                 // send response to active side
                 let message = {
