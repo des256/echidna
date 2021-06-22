@@ -58,6 +58,8 @@ impl Subscriber {
             this.run_participant_receiver(stream).await;
         });
 
+        println!("started subscriber {:016X} of \"{}\" at {}",id,topic,address.port());
+
         subscriber
     }
 
@@ -69,11 +71,9 @@ impl Subscriber {
         while let Ok(_) = stream.read(&mut recv_buffer).await {
             if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
                 match message {
-                    PartToSub::Init => {
-                        println!("subscriber initialized");
-                    },
-                    _ => {
-                        println!("TODO: some other message...");
+                    PartToSub::Init => { },
+                    PartToSub::InitFailed => {
+                        panic!("publisher initialization failed!");
                     },
                 }
             }

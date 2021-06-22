@@ -261,7 +261,6 @@ impl Participant {
         // create local publisher reference
         {
             let mut state_pubs = self.pubs.lock().await;
-            println!("new local publisher {:016X}",id);
             state_pubs.insert(id,LocalPubRef {
                 stream: stream_write,
                 topic: publisher.topic.clone(),
@@ -275,7 +274,6 @@ impl Participant {
         // destroy local publisher reference
         {
             let mut state_pubs = self.pubs.lock().await;
-            println!("local publisher {:016X} lost",id);
             state_pubs.remove(&id);
         }
 
@@ -319,7 +317,6 @@ impl Participant {
         // create local subscriber reference
         {
             let mut state_subs = self.subs.lock().await;
-            println!("new local subscriber {:016X}",id);
             state_subs.insert(id,LocalSubRef {
                 stream: stream_write,
                 address: subscriber.address,
@@ -334,7 +331,6 @@ impl Participant {
         // destroy local subscriber reference
         {
             let mut state_subs = self.subs.lock().await;
-            println!("local subscriber {:016X} lost",id);
             state_subs.remove(&id);
         }
 
@@ -423,18 +419,6 @@ impl Participant {
                     state_peers.insert(peer_id,peer);
                 }
 
-                println!("connected to peer {:016X} at {}",peer_id,address);
-                {
-                    let state_peers = self.peers.lock().await;
-                    let peer = state_peers.get(&peer_id).unwrap();
-                    for (id,p) in &peer.pubs {
-                        println!("    publisher {:016X} for \"{}\"",id,p.topic);
-                    }
-                    for (id,s) in &peer.subs {
-                        println!("    subscriber {:016X} for \"{}\" at {}",id,s.topic,s.address);
-                    }
-                }
-
                 // notify relevant local publishers of the new subscribers
                 {
                     let state_peers = self.peers.lock().await;
@@ -451,7 +435,6 @@ impl Participant {
 
                 // handle rest of the messages
                 self.run_peer(stream_read,peer_id).await;
-                println!("peer {:016X} lost",peer_id);
 
                 // notify relevant local publishers of lost subscribers
                 {
@@ -543,18 +526,6 @@ impl Participant {
                     state_peers.insert(peer_id,peer);
                 }
 
-                println!("connected to peer {:016X} at {}",peer_id,address);
-                {
-                    let state_peers = self.peers.lock().await;
-                    let peer = state_peers.get(&peer_id).unwrap();
-                    for (id,p) in &peer.pubs {
-                        println!("    publisher {:016X} for \"{}\"",id,p.topic);
-                    }
-                    for (id,s) in &peer.subs {
-                        println!("    subscriber {:016X} for \"{}\"",id,s.topic);
-                    }
-                }
-
                 // notify relevant local publishers of the new subscribers
                 {
                     let state_peers = self.peers.lock().await;
@@ -571,7 +542,6 @@ impl Participant {
 
                 // handle rest of the messages
                 self.run_peer(stream_read,peer_id).await;
-                println!("peer {:016X} lost",peer_id);
 
                 // notify relevant local publishers of lost subscribers
                 {
@@ -609,9 +579,6 @@ impl Participant {
 
                     // peer has new publisher
                     PeerToPeer::NewPub(id,publisher) => {
-                        println!("NewPub");
-
-                        // create remote publisher reference
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.insert(id,publisher);
@@ -619,9 +586,6 @@ impl Participant {
 
                     // peer lost publisher
                     PeerToPeer::DropPub(id) => {
-                        println!("DropPub");
-
-                        // remove remote publisher reference
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.remove(&id);
@@ -629,17 +593,12 @@ impl Participant {
 
                     // peer has new subscriber
                     PeerToPeer::NewSub(id,subscriber) => {
-                        println!("NewSub");
-
-                        // inform relevant local pubs about new subscriber
                         let mut state_pubs = self.pubs.lock().await;
                         for (_,p) in state_pubs.iter_mut() {
                             if p.topic == subscriber.topic {
                                 send_message(&mut p.stream,PartToPub::NewSub(id,subscriber.clone())).await;
                             }
                         }
-
-                        // create remote subscriber reference
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.insert(id,subscriber);
@@ -647,15 +606,10 @@ impl Participant {
 
                     // peer lost subscriber
                     PeerToPeer::DropSub(id) => {
-                        println!("DropSub");
-
-                        // remove remote subscriber reference (but keep topic)
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         let topic = peer.subs.get(&id).unwrap().topic.clone();
                         peer.subs.remove(&id);
-
-                        // inform relevant local pubs about lost subscriber
                         let mut state_pubs = self.pubs.lock().await;
                         for (_,p) in state_pubs.iter_mut() {
                             if p.topic == topic {

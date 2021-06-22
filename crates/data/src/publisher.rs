@@ -34,8 +34,6 @@ impl Publisher {
         // new ID
         let id = rand::random::<u64>();
 
-        println!("starting publisher {:016X}",id);
-
         // connect to participant
         let mut stream = net::TcpStream::connect("0.0.0.0:7332").await.expect("cannot connect to participant");
 
@@ -64,6 +62,8 @@ impl Publisher {
         task::spawn(async move {
             this.run_participant_receiver(stream).await;
         });
+
+        println!("started publisher {:016X} of \"{}\" at {}",id,topic,address.port());
         
         publisher
     }
@@ -79,16 +79,12 @@ impl Publisher {
                     PartToPub::Init(subs) => {
                         let mut state = self.state.lock().await;
                         state.subs = subs;
-                        println!("publisher initialized:");
-                        for (id,s) in &state.subs {
-                            println!("    subscriber {:016X} at {} for topic \"{}\"",id,s.address,s.topic);
-                        }
                     },
                     PartToPub::InitFailed => {
                         panic!("publisher initialization failed!");
                     },
                     PartToPub::NewSub(id,subscriber) => {
-                        println!("new subscriber {:016X} at {}",id,subscriber.address);
+                        println!("new subscriber {:016X} found at {}",id,subscriber.address);
                     },
                     PartToPub::DropSub(id) => {
                         println!("lost subscriber {:016X}",id);
