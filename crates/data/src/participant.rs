@@ -24,6 +24,7 @@ use {
 };
 
 pub struct PeerRef {
+    pub ip: IpAddr,
     pub stream: io::WriteHalf<net::TcpStream>,
     pub pubs: HashMap<PubId,PubRef>,
     pub subs: HashMap<SubId,SubRef>,
@@ -235,7 +236,7 @@ impl Participant {
             for (id,s) in state_subs.iter() {
                 if s.topic == publisher.topic {
                     subs.insert(*id,SubRef {
-                        address: s.address,
+                        address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),s.address.port()),
                         topic: s.topic.clone(),
                     });
                 }
@@ -376,6 +377,7 @@ impl Participant {
 
         // create peer
         let mut peer = PeerRef {
+            ip: address.ip(),
             stream: stream_write,
             pubs: HashMap::new(),
             subs: HashMap::new(),
@@ -439,7 +441,10 @@ impl Participant {
                     for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                send_message(&mut p.stream,PartToPub::NewSub(*sid,s.clone())).await;
+                                send_message(&mut p.stream,PartToPub::NewSub(*sid,SubRef {
+                                    address: SocketAddr::new(peer.ip,s.address.port()),
+                                    topic: s.topic.clone(),
+                                })).await;
                             }
                         }
                     }
@@ -490,6 +495,7 @@ impl Participant {
 
                 // create peer
                 let mut peer = PeerRef {
+                    ip: address.ip(),
                     stream: stream_write,
                     pubs: message.pubs,
                     subs: HashMap::new(),
@@ -546,7 +552,10 @@ impl Participant {
                     for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                send_message(&mut p.stream,PartToPub::NewSub(*sid,s.clone())).await;
+                                send_message(&mut p.stream,PartToPub::NewSub(*sid,SubRef {
+                                    address: SocketAddr::new(peer.ip,s.address.port()),
+                                    topic: s.topic.clone(),
+                                })).await;
                             }
                         }
                     }
@@ -605,14 +614,17 @@ impl Participant {
 
                     // peer has new subscriber
                     PeerToPeer::NewSub(id,subscriber) => {
+                        let mut state_peers = self.peers.lock().await;
+                        let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         let mut state_pubs = self.pubs.lock().await;
                         for (_,p) in state_pubs.iter_mut() {
                             if p.topic == subscriber.topic {
-                                send_message(&mut p.stream,PartToPub::NewSub(id,subscriber.clone())).await;
+                                send_message(&mut p.stream,PartToPub::NewSub(id,SubRef {
+                                    address: SocketAddr::new(peer.ip,subscriber.address.port()),
+                                    topic: subscriber.topic.clone(),
+                                })).await;
                             }
                         }
-                        let mut state_peers = self.peers.lock().await;
-                        let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.insert(id,subscriber);
                     },
 
