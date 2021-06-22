@@ -335,8 +335,8 @@ impl Participant {
         // initialize local subscriber
         println!("    initialize subscriber {:016X}",id);
         {
-            let mut state_pubs = self.pubs.lock().await;
-            let p = state_pubs.get_mut(&id).unwrap();
+            let mut state_subs = self.subs.lock().await;
+            let p = state_subs.get_mut(&id).unwrap();
             send_message(&mut p.stream,PartToSub::Init).await;
         }
 
