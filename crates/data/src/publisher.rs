@@ -94,8 +94,12 @@ impl Publisher {
                             },
                             PartToPub::NewSub(id,subscriber) => {
                                 println!("subscriber {:016X} found at {}",id,subscriber.address);
+                                let mut state = self.state.lock().await;
+                                state.subs.insert(id,subscriber);
                             },
                             PartToPub::DropSub(id) => {
+                                let mut state = self.state.lock().await;
+                                state.subs.remove(&id);
                                 println!("subscriber {:016X} lost",id);
                             },
                         }
@@ -114,7 +118,66 @@ impl Publisher {
         }
     }
 
-    pub async fn send(self: &Arc<Publisher>,_data: &[u8]) {
+    pub async fn send(self: &Arc<Publisher>,message: &[u8]) {
 
+        // if there are no subscribers, ignore
+        {
+            let state = self.state.lock().await;
+            if state.subs.len() == 0 {
+                return;
+            }
+        }
+
+        // calculate number of chunks for this message
+        let total_bytes = message.len();
+        let mut total = total_bytes / CHUNK_SIZE;
+        if (total_bytes % CHUNK_SIZE) != 0 {
+            total += 1;
+        }
+        
+        // prepare new message
+        let id = rand::random::<u64>();
+
+        // send message to all subscribers
+        let mut index = 0u32;
+        let mut offset = 0usize;
+        while offset < total_bytes {
+
+            let mut buffer = Vec::<u8>::new();
+
+            // prepare header
+            let header = ChunkHeader {
+                ts: 0,
+                id: id,
+                total_bytes: total_bytes as u64,
+                total: total as u32,
+                index: index,
+            };
+            PubToSub::Chunk(header).encode(&mut buffer);
+
+            // append chunk
+            let size = {
+                if (offset + CHUNK_SIZE) > total_bytes {
+                    total_bytes - offset
+                }
+                else {
+                    CHUNK_SIZE
+                }
+            };
+            buffer.extend_from_slice(&message[offset..offset + size]);
+
+            // send chunk to all subscribers
+            {
+                let state = self.state.lock().await;
+                for (_,subscriber) in &state.subs {
+                    self.socket.send_to(&mut buffer,subscriber.address).await.expect("error sending data chunk");
+                    // ====
+                }
+            }
+
+            // next chunk
+            offset += size;
+            index += 1;
+        }
     }
 }

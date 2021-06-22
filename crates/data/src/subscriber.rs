@@ -16,6 +16,12 @@ use {
     },
 };
 
+pub struct SubscriberState {
+    id: DataId,
+    buffer: Vec<u8>,
+    received: Vec<bool>,
+}
+
 pub struct Subscriber {
     pub id: PubId,
     pub topic: String,
@@ -24,7 +30,7 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub async fn new(topic: &str,_on_data: impl Fn(&[u8]) + Send + 'static) -> Arc<Subscriber> {
+    pub async fn new(topic: &str,on_data: impl Fn(&[u8]) + Send + 'static) -> Arc<Subscriber> {
 
         // new ID
         let id = rand::random::<u64>();
@@ -45,6 +51,12 @@ impl Subscriber {
         let this = Arc::clone(&subscriber);
         task::spawn(async move {
             this.run_participant_connection().await;
+        });
+
+        // spawn socket receiver
+        let this = Arc::clone(&subscriber);
+        task::spawn(async move {
+            this.run_socket_receiver(on_data).await;
         });
 
         println!("subscriber {:016X} of \"{}\" running at port {}",id,topic,address.port());
@@ -91,6 +103,67 @@ impl Subscriber {
             time::sleep(Duration::from_secs(5)).await;
 
             println!("attempting connection again.");
+        }
+    }
+
+    pub async fn run_socket_receiver(self: &Arc<Subscriber>,on_data: impl Fn(&[u8]) + Send + 'static) {
+        let mut state = SubscriberState {
+            id: 0,
+            buffer: Vec::new(),
+            received: Vec::new(),
+        };
+
+        let mut buffer = vec![0u8; 65536];
+
+        loop {
+
+            // receive header + data
+            let (full_length,_) = self.socket.recv_from(&mut buffer).await.expect("error receiving");
+
+            if let Some((length,pts)) = PubToSub::decode(&buffer) {
+
+                match pts {
+
+                    // incoming chunk
+                    PubToSub::Chunk(chunk) => {
+
+                        // get data part of message
+                        let data = &buffer[length..full_length];
+
+                        // if this is a new chunk, reset state
+                        if chunk.id != state.id {
+                            state.id = chunk.id;
+                            state.buffer = vec![0; chunk.total as usize * CHUNK_SIZE];
+                            state.received = vec![false; chunk.total as usize];
+                        }
+
+                        // copy data into final message buffer
+                        let start = chunk.index as usize * CHUNK_SIZE;
+                        let end = start + data.len();
+                        state.buffer[start..end].copy_from_slice(data);
+
+                        // mark the chunk as received
+                        state.received[chunk.index as usize] = true;
+
+                        // find out if all chunks are received
+                        let mut complete = true;
+                        for received in &state.received {
+                            if !received {
+                                complete = false;
+                                break;
+                            }
+                        }
+
+                        // if all chunks received, pass to callback
+                        if complete {
+                            on_data(&state.buffer[0..chunk.total_bytes as usize]);
+                        }
+                    },
+                }
+            }
+            else {
+                println!("message error");
+            }
         }
     }
 }

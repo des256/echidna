@@ -5,10 +5,7 @@ use {
         time,
     },
     codec::Codec,
-    std::{
-        sync::Arc,
-        time::Duration,
-    },
+    std::time::Duration,
 };
 
 async fn async_main() {
@@ -23,7 +20,6 @@ async fn async_main() {
     let message = "This message is really awesome!".to_string();
     let mut buffer = Vec::<u8>::new();
     message.encode(&mut buffer);
-    let buffer = Arc::new(buffer);
 
     // publish message every 5 seconds
     loop {

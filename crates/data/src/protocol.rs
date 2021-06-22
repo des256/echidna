@@ -12,9 +12,31 @@ use {
     },
 };
 
+pub const CHUNK_SIZE: usize = 16384;
+
+pub type DataId = u64;
 pub type PeerId = u64;
 pub type PubId = u64;
 pub type SubId = u64;
+
+#[derive(Codec)]
+pub struct ChunkHeader {
+    pub ts: u64,
+    pub id: DataId,
+    pub total_bytes: u64,
+    pub total: u32,
+    pub index: u32,
+}
+
+#[derive(Codec)]
+pub enum PubToSub {
+    Chunk(ChunkHeader),
+}
+
+#[derive(Codec)]
+pub enum SubToPub {
+    PleaseWaitThereWillBeMore,
+}
 
 #[derive(Codec)]
 pub struct Beacon {
