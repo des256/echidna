@@ -98,8 +98,6 @@ impl Participant {
             this.run_local_listener().await;
         });
 
-        println!("participant {:016X} running at port {}",id,port);
-
         participant
     }
 
@@ -225,8 +223,6 @@ impl Participant {
 
     async fn run_publisher(self: &Arc<Participant>,stream: net::TcpStream,id: PubId,publisher: PubRef) {
 
-        println!("local publisher {:016X} of \"{}\" appeared",id,publisher.topic);
-
         // This task runs communication with the local publisher (currently no traffic).
 
         // split stream read and write ends
@@ -239,7 +235,6 @@ impl Participant {
                 stream: stream_write,
                 topic: publisher.topic.clone(),
             });
-            println!("    added local publisher {:016X}",id);
         }
 
         // initialize local publisher
@@ -266,10 +261,6 @@ impl Participant {
                 }
             }
         }
-        println!("    initialize publisher {:016X}:",id);
-        for (sid,_) in subs.iter() {
-            println!("        subscriber {:016X}",sid);
-        }
         {
             let mut state_pubs = self.pubs.lock().await;
             let p = state_pubs.get_mut(&id).unwrap();
@@ -279,8 +270,7 @@ impl Participant {
         // inform all peers of new publisher
         {
             let mut state_peers = self.peers.lock().await;
-            for (pid,peer) in state_peers.iter_mut() {
-                println!("    informing peer {:016X} about new publisher {:016X}",pid,id);
+            for (_,peer) in state_peers.iter_mut() {
                 send_message(&mut peer.stream,PeerToPeer::NewPub(id,publisher.clone())).await;
             }
         }
@@ -293,13 +283,10 @@ impl Participant {
             }
         }
 
-        println!("local publisher {:016X} of \"{}\" lost",id,publisher.topic);
-
         // inform all peers that publisher is lost
         {
             let mut state_peers = self.peers.lock().await;
-            for (pid,peer) in state_peers.iter_mut() {
-                println!("    informing peer {:016X} about lost publisher {:016X}",pid,id);
+            for (_,peer) in state_peers.iter_mut() {
                 send_message(&mut peer.stream,PeerToPeer::DropPub(id)).await;
             }
         }
@@ -308,13 +295,10 @@ impl Participant {
         {
             let mut state_pubs = self.pubs.lock().await;
             state_pubs.remove(&id);
-            println!("    removed local publisher {:016X}",id);
         }
     }
 
     async fn run_subscriber(self: &Arc<Participant>,stream: net::TcpStream,id: SubId,subscriber: SubRef) {
-
-        println!("local subscriber {:016X} of \"{}\" appeared",id,subscriber.topic);
 
         // This task runs communication with the local subscriber.
 
@@ -329,11 +313,9 @@ impl Participant {
                 address: subscriber.address,
                 topic: subscriber.topic.clone(),
             });
-            println!("    added local subscriber {:016X}",id);
         }
 
         // initialize local subscriber
-        println!("    initialize subscriber {:016X}",id);
         {
             let mut state_subs = self.subs.lock().await;
             let p = state_subs.get_mut(&id).unwrap();
@@ -343,9 +325,8 @@ impl Participant {
         // inform relevant local publishers of new subscriber
         {
             let mut state_pubs = self.pubs.lock().await;
-            for (pid,p) in state_pubs.iter_mut() {
+            for (_,p) in state_pubs.iter_mut() {
                 if p.topic == subscriber.topic {
-                    println!("    informing local publisher {:016X} about new subscriber {:016X}",pid,id);
                     send_message(&mut p.stream,PartToPub::NewSub(id,SubRef {
                         address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),subscriber.address.port()),
                         topic: subscriber.topic.clone(),
@@ -357,8 +338,7 @@ impl Participant {
         // inform all peers of new subscriber
         {
             let mut state_peers = self.peers.lock().await;
-            for (pid,peer) in state_peers.iter_mut() {
-                println!("    informing peer {:016X} about new subscriber {:016X}",pid,id);
+            for (_,peer) in state_peers.iter_mut() {
                 send_message(&mut peer.stream,PeerToPeer::NewSub(id,subscriber.clone())).await;
             }
         }
@@ -371,20 +351,16 @@ impl Participant {
             }
         }
 
-        println!("local subscriber {:016X} of \"{}\" lost",id,subscriber.topic);
-
         // destroy local subscriber reference
         {
             let mut state_subs = self.subs.lock().await;
             state_subs.remove(&id);
-            println!("    removed local subscriber {:016X}",id);
         }
 
         // inform all peers that subscriber is lost
         {
             let mut state_peers = self.peers.lock().await;
-            for (pid,peer) in state_peers.iter_mut() {
-                println!("    informing peer {:016X} about lost subscriber {:016X}",pid,id);
+            for (_,peer) in state_peers.iter_mut() {
                 send_message(&mut peer.stream,PeerToPeer::DropSub(id)).await;
             }
         }
@@ -392,9 +368,8 @@ impl Participant {
         // inform relevant local publishers that subscriber is lost
         {
             let mut state_pubs = self.pubs.lock().await;
-            for (pid,p) in state_pubs.iter_mut() {
+            for (_,p) in state_pubs.iter_mut() {
                 if p.topic == subscriber.topic {
-                    println!("    informing local publisher {:016X} about lost subscriber {:016X}",pid,id);
                     send_message(&mut p.stream,PartToPub::DropSub(id)).await;
                 }
             }
@@ -404,8 +379,6 @@ impl Participant {
     async fn run_active_peer(self: &Arc<Participant>,stream: net::TcpStream,peer_id: PeerId) {
 
         // This task handles communication with a peer from the active side.
-
-        println!("peer {:016X} appeared",peer_id);
 
         let address = stream.peer_addr().unwrap();
 
@@ -449,13 +422,6 @@ impl Participant {
                 subs: subs,
             }
         };
-        println!("    announcing to passive side {:016X}:",peer_id);
-        for (pid,_) in message.pubs.iter() {
-            println!("        publisher {:016X}",pid);
-        }
-        for (sid,_) in message.subs.iter() {
-            println!("        subscriber {:016X}",sid);
-        }
         send_message(&mut peer.stream,message).await;
 
         // get counter announcement from passive side
@@ -470,19 +436,11 @@ impl Participant {
                         topic: s.topic.clone(),
                     });
                 }
-                println!("    received announcement from passive side {:016X}:",peer_id);
-                for (pid,_) in peer.pubs.iter() {
-                    println!("        publisher {:016X}",pid);
-                }
-                for (sid,_) in peer.subs.iter() {
-                    println!("        subscriber {:016X}",sid);
-                }
 
                 // and make peer reference live
                 {
                     let mut state_peers = self.peers.lock().await;
                     state_peers.insert(peer_id,peer);
-                    println!("    added peer {:016X}",peer_id);
                 }
 
                 // notify relevant local publishers of the new subscribers
@@ -490,10 +448,9 @@ impl Participant {
                     let state_peers = self.peers.lock().await;
                     let mut state_pubs = self.pubs.lock().await;
                     let peer = state_peers.get(&peer_id).unwrap();
-                    for (pid,p) in state_pubs.iter_mut() {
+                    for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                println!("    informing local publisher {:016X} about new remote subscriber {:016X}",pid,sid);
                                 send_message(&mut p.stream,PartToPub::NewSub(*sid,SubRef {
                                     address: SocketAddr::new(peer.ip,s.address.port()),
                                     topic: s.topic.clone(),
@@ -506,17 +463,14 @@ impl Participant {
                 // handle rest of the messages
                 self.run_peer(stream_read,peer_id).await;
 
-                println!("peer {:016X} lost",peer_id);
-
                 // notify relevant local publishers of lost subscribers
                 {
                     let state_peers = self.peers.lock().await;
                     let mut state_pubs = self.pubs.lock().await;
                     let peer = state_peers.get(&peer_id).unwrap();
-                    for (pid,p) in state_pubs.iter_mut() {
+                    for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                println!("    informing local publisher {:016X} about lost remote subscriber {:016X}",pid,sid);
                                 send_message(&mut p.stream,PartToPub::DropSub(*sid)).await;
                             }
                         }
@@ -527,7 +481,6 @@ impl Participant {
                 {
                     let mut state_peers = self.peers.lock().await;
                     state_peers.remove(&peer_id);
-                    println!("    removed peer {:016X}",peer_id);
                 }
             }
         }
@@ -536,8 +489,6 @@ impl Participant {
     async fn run_passive_peer(self: &Arc<Participant>,stream: net::TcpStream) {
 
         // This task handles communication with a peer from the passive side.
-
-        println!("peer appeared");
 
         let address = stream.peer_addr().unwrap();
 
@@ -551,16 +502,6 @@ impl Participant {
 
                 // store new peer ID
                 let peer_id = message.id;
-
-                println!("    peer id = {:016X}",peer_id);
-
-                println!("    received announcement from active side {:016X}:",peer_id);
-                for (pid,_) in message.pubs.iter() {
-                    println!("        publisher {:016X}",pid);
-                }
-                for (sid,_) in message.subs.iter() {
-                    println!("        subscriber {:016X}",sid);
-                }
 
                 // create peer
                 let mut peer = PeerRef {
@@ -605,20 +546,12 @@ impl Participant {
                         subs: subs,
                     }
                 };
-                println!("    announcing to active side {:016X}:",peer_id);
-                for (pid,_) in message.pubs.iter() {
-                    println!("        publisher {:016X}",pid);
-                }
-                for (sid,_) in message.subs.iter() {
-                    println!("        subscriber {:016X}",sid);
-                }        
                 send_message(&mut peer.stream,message).await;
 
                 // and make peer reference live
                 {
                     let mut state_peers = self.peers.lock().await;
                     state_peers.insert(peer_id,peer);
-                    println!("    added peer {:016X}",peer_id);
                 }
 
                 // notify relevant local publishers of the new subscribers
@@ -626,10 +559,9 @@ impl Participant {
                     let state_peers = self.peers.lock().await;
                     let mut state_pubs = self.pubs.lock().await;
                     let peer = state_peers.get(&peer_id).unwrap();
-                    for (pid,p) in state_pubs.iter_mut() {
+                    for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                println!("    informing local publisher {:016X} about new remote subscriber {:016X}",pid,sid);
                                 send_message(&mut p.stream,PartToPub::NewSub(*sid,SubRef {
                                     address: SocketAddr::new(peer.ip,s.address.port()),
                                     topic: s.topic.clone(),
@@ -642,17 +574,14 @@ impl Participant {
                 // handle rest of the messages
                 self.run_peer(stream_read,peer_id).await;
 
-                println!("peer {:016X} lost",peer_id);
-
                 // notify relevant local publishers of lost subscribers
                 {
                     let state_peers = self.peers.lock().await;
                     let mut state_pubs = self.pubs.lock().await;
                     let peer = state_peers.get(&peer_id).unwrap();
-                    for (pid,p) in state_pubs.iter_mut() {
+                    for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                println!("    informing local publisher {:016X} about lost remote subscriber {:016X}",pid,sid);
                                 send_message(&mut p.stream,PartToPub::DropSub(*sid)).await;
                             }
                         }
@@ -663,7 +592,6 @@ impl Participant {
                 {
                     let mut state_peers = self.peers.lock().await;
                     state_peers.remove(&peer_id);
-                    println!("    removed peer {:016X}",peer_id);
                 }
             }
         }
@@ -685,7 +613,6 @@ impl Participant {
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.insert(id,publisher);
-                        println!("added remote publisher {:016X} of peer {:016X}",id,peer_id);
                     },
 
                     // peer lost publisher
@@ -693,7 +620,6 @@ impl Participant {
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.remove(&id);
-                        println!("removed remote publisher {:016X} of peer {:016X}",id,peer_id);
                     },
 
                     // peer has new subscriber
@@ -701,9 +627,8 @@ impl Participant {
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         let mut state_pubs = self.pubs.lock().await;
-                        for (pid,p) in state_pubs.iter_mut() {
+                        for (_,p) in state_pubs.iter_mut() {
                             if p.topic == subscriber.topic {
-                                println!("informing local publisher {:016X} of new remote subscriber {:016X}",pid,id);
                                 send_message(&mut p.stream,PartToPub::NewSub(id,SubRef {
                                     address: SocketAddr::new(peer.ip,subscriber.address.port()),
                                     topic: subscriber.topic.clone(),
@@ -711,7 +636,6 @@ impl Participant {
                             }
                         }
                         peer.subs.insert(id,subscriber);
-                        println!("added remote subscriber {:016X} of peer {:016X}",id,peer_id);
                     },
 
                     // peer lost subscriber
@@ -720,14 +644,12 @@ impl Participant {
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         let topic = peer.subs.get(&id).unwrap().topic.clone();
                         let mut state_pubs = self.pubs.lock().await;
-                        for (pid,p) in state_pubs.iter_mut() {
+                        for (_,p) in state_pubs.iter_mut() {
                             if p.topic == topic {
-                                println!("informing local publisher {:016X} of lost remote subscriber {:016X}",pid,id);
                                 send_message(&mut p.stream,PartToPub::DropSub(id)).await;
                             }
                         }
                         peer.subs.remove(&id);
-                        println!("removed remote subscriber {:016X} of peer {:016X}",id,peer_id);
                     },
                 }
             }
