@@ -478,6 +478,13 @@ impl Participant {
                     println!("        subscriber {:016X}",sid);
                 }
 
+                // and make peer reference live
+                {
+                    let mut state_peers = self.peers.lock().await;
+                    state_peers.insert(peer_id,peer);
+                    println!("    added peer {:016X}",peer_id);
+                }
+
                 // notify relevant local publishers of the new subscribers
                 {
                     let state_peers = self.peers.lock().await;
