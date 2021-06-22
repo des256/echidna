@@ -10,14 +10,11 @@ use {
 
 async fn async_main() {
 
-    // create participant (this can be another process, but for now start it here)
-    //let _participant = Participant::new().await;
-
     // create hello publisher
     let publisher = Publisher::new("/hello").await;
 
     // prepare message (string for now)
-    let message = "This message is really awesome!".to_string();
+    let message = "Hello!".to_string();
     let mut buffer = Vec::<u8>::new();
     message.encode(&mut buffer);
 

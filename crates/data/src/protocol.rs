@@ -20,22 +20,24 @@ pub type PubId = u64;
 pub type SubId = u64;
 
 #[derive(Codec)]
-pub struct ChunkHeader {
+pub struct Chunk {
     pub ts: u64,
     pub id: DataId,
     pub total_bytes: u64,
     pub total: u32,
     pub index: u32,
+    pub data: Vec<u8>,
 }
 
 #[derive(Codec)]
 pub enum PubToSub {
-    Chunk(ChunkHeader),
+    Heartbeat(DataId),
+    Chunk(Chunk),
 }
 
 #[derive(Codec)]
 pub enum SubToPub {
-    PleaseWaitThereWillBeMore,
+    Resend(SubId,DataId,Vec<u32>),
 }
 
 #[derive(Codec)]

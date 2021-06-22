@@ -19,9 +19,6 @@ fn on_message(buffer: &[u8]) {
 
 async fn async_main() {
 
-    // create participant (this can be another process, but for now start it here)
-    //let _participant = Participant::new().await;
-
     // create and register hello subscriber
     let _subscriber = Subscriber::new("/hello",on_message).await;
 

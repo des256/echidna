@@ -6,6 +6,7 @@ use {
         net,
         task,
         io::AsyncReadExt,
+        sync::Mutex,
         time,
     },
     codec::Codec,
@@ -27,6 +28,7 @@ pub struct Subscriber {
     pub topic: String,
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
+    pub state: Mutex<SubscriberState>,
 }
 
 impl Subscriber {
@@ -45,6 +47,11 @@ impl Subscriber {
             topic: topic.to_string(),
             socket: socket,
             address: address,
+            state: Mutex::new(SubscriberState {
+                id: 0,
+                buffer: Vec::new(),
+                received: Vec::new(),
+            }),
         });
 
         // spawn participant receiver
@@ -107,47 +114,66 @@ impl Subscriber {
     }
 
     pub async fn run_socket_receiver(self: &Arc<Subscriber>,on_data: impl Fn(&[u8]) + Send + 'static) {
-        let mut state = SubscriberState {
-            id: 0,
-            buffer: Vec::new(),
-            received: Vec::new(),
-        };
 
         let mut buffer = vec![0u8; 65536];
 
         loop {
 
             // receive header + data
-            let (full_length,_) = self.socket.recv_from(&mut buffer).await.expect("error receiving");
+            let (_,address) = self.socket.recv_from(&mut buffer).await.expect("error receiving");
 
-            if let Some((length,pts)) = PubToSub::decode(&buffer) {
+            if let Some((_,pts)) = PubToSub::decode(&buffer) {
 
                 match pts {
+
+                    // Heartbeat
+                    PubToSub::Heartbeat(id) => {
+
+                        let state = self.state.lock().await;
+
+                        // only respond if this is for the current message
+                        if id == state.id {
+
+                            // collect missing indices
+                            let mut indices = Vec::<u32>::new();
+                            for i in 0..state.received.len() {
+                                if !state.received[i] {
+                                    indices.push(i as u32);
+                                }
+                            }
+
+                            // request resend
+                            if indices.len() != 0 {
+                                let mut send_buffer = Vec::<u8>::new();
+                                SubToPub::Resend(self.id,id,indices).encode(&mut send_buffer);
+                                self.socket.send_to(&mut send_buffer,address).await.expect("error sending acknowledgement");
+                            }
+                        }
+                    },
 
                     // incoming chunk
                     PubToSub::Chunk(chunk) => {
 
-                        // get data part of message
-                        let data = &buffer[length..full_length];
+                        let mut state = self.state.lock().await;
 
                         // if this is a new chunk, reset state
                         if chunk.id != state.id {
                             state.id = chunk.id;
-                            state.buffer = vec![0; chunk.total as usize * CHUNK_SIZE];
+                            state.buffer = vec![0; chunk.total_bytes as usize];
                             state.received = vec![false; chunk.total as usize];
                         }
 
                         // copy data into final message buffer
                         let start = chunk.index as usize * CHUNK_SIZE;
-                        let end = start + data.len();
-                        state.buffer[start..end].copy_from_slice(data);
+                        let end = start + chunk.data.len();
+                        state.buffer[start..end].copy_from_slice(&chunk.data);
 
                         // mark the chunk as received
                         state.received[chunk.index as usize] = true;
 
-                        // find out if all chunks are received
+                        // verify if all chunks are received
                         let mut complete = true;
-                        for received in &state.received {
+                        for received in state.received.iter() {
                             if !received {
                                 complete = false;
                                 break;
@@ -156,7 +182,7 @@ impl Subscriber {
 
                         // if all chunks received, pass to callback
                         if complete {
-                            on_data(&state.buffer[0..chunk.total_bytes as usize]);
+                            on_data(&state.buffer);
                         }
                     },
                 }
