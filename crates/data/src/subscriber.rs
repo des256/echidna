@@ -6,12 +6,13 @@ use {
         net,
         task,
         io::AsyncReadExt,
-        io::AsyncWriteExt,
+        time,
     },
     codec::Codec,
     std::{
         sync::Arc,
         net::SocketAddr,
+        time::Duration,
     },
 };
 
@@ -28,21 +29,9 @@ impl Subscriber {
         // new ID
         let id = rand::random::<u64>();
 
-        // connect to participant
-        let mut stream = net::TcpStream::connect("0.0.0.0:7332").await.expect("cannot connect to participant");
-
         // open data socket
         let socket = net::UdpSocket::bind("0.0.0.0:0").await.expect("cannot create subscriber socket");
         let address = socket.local_addr().expect("cannot get local address of socket");
-
-        // announce subscriber to participant
-        let message = ToPart::InitSub(id,SubRef {
-            address: address,
-            topic: topic.to_string(),
-        });
-        let mut send_buffer = Vec::<u8>::new();
-        message.encode(&mut send_buffer);
-        stream.write_all(&send_buffer).await.expect("cannot send InitSub");
 
         // create subscriber
         let subscriber = Arc::new(Subscriber {
@@ -55,28 +44,49 @@ impl Subscriber {
         // spawn participant receiver
         let this = Arc::clone(&subscriber);
         task::spawn(async move {
-            this.run_participant_receiver(stream).await;
+            this.run_participant_connection().await;
         });
 
-        println!("started subscriber {:016X} of \"{}\" at {}",id,topic,address.port());
+        println!("subscriber {:016X} of \"{}\" running at port {}",id,topic,address.port());
 
         subscriber
     }
 
-    pub async fn run_participant_receiver(self: &Arc<Subscriber>,mut stream: net::TcpStream) {
+    pub async fn run_participant_connection(self: &Arc<Subscriber>) {
 
-        let mut recv_buffer = vec![0u8; 65536];
+        loop {
 
-        // receive participant messages
-        while let Ok(_) = stream.read(&mut recv_buffer).await {
-            if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
-                match message {
-                    PartToSub::Init => { },
-                    PartToSub::InitFailed => {
-                        panic!("publisher initialization failed!");
-                    },
+            // connect to participant
+            let mut stream = net::TcpStream::connect("0.0.0.0:7332").await.expect("cannot connect to participant");
+
+            // announce subscriber to participant
+            send_message(&mut stream,ToPart::InitSub(self.id,SubRef {
+                address: self.address,
+                topic: self.topic.clone(),
+            })).await;
+
+            // receive participant messages
+            let mut recv_buffer = vec![0u8; 65536];
+            while let Ok(length) = stream.read(&mut recv_buffer).await {
+                if length == 0 {
+                    break;
+                }
+                if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
+                    match message {
+                        PartToSub::Init => { },
+                        PartToSub::InitFailed => {
+                            panic!("publisher initialization failed!");
+                        },
+                    }
                 }
             }
+
+            println!("participant lost...");
+
+            // wait for a few seconds before trying again
+            time::sleep(Duration::from_secs(5)).await;
+
+            println!("attempting connection again.");
         }
     }
 }

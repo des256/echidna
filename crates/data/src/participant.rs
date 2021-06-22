@@ -16,6 +16,7 @@ use {
         sync::Arc,
         time::Duration,
         net::{
+            IpAddr,
             Ipv4Addr,
             SocketAddr,
         },
@@ -71,8 +72,6 @@ impl Participant {
             subs: Mutex::new(HashMap::new()),
         });
 
-        println!("created participant {:016X} at port {}",id,port);
-
         // spawn beacon broadcaster
         let this = Arc::clone(&participant);
         task::spawn(async move {
@@ -96,6 +95,8 @@ impl Participant {
         task::spawn(async move {
             this.run_local_listener().await;
         });
+
+        println!("participant {:016X} running at port {}",id,port);
 
         participant
     }
@@ -269,7 +270,11 @@ impl Participant {
 
         // wait for connection to break
         let mut buffer = vec![0u8; 65536];
-        while let Ok(_) = stream_read.read(&mut buffer).await { }
+        while let Ok(length) = stream_read.read(&mut buffer).await {
+            if length == 0 {
+                break;
+            }
+        }
 
         // destroy local publisher reference
         {
@@ -301,7 +306,10 @@ impl Participant {
             let mut state_pubs = self.pubs.lock().await;
             for (_,p) in state_pubs.iter_mut() {
                 if p.topic == subscriber.topic {
-                    send_message(&mut p.stream,PeerToPeer::NewSub(id,subscriber.clone())).await;
+                    send_message(&mut p.stream,PeerToPeer::NewSub(id,SubRef {
+                        address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),subscriber.address.port()),
+                        topic: subscriber.topic.clone(),
+                    })).await;
                 }
             }
         }
@@ -326,7 +334,11 @@ impl Participant {
 
         // wait for connection to break
         let mut buffer = vec![0u8; 65536];
-        while let Ok(_) = stream_read.read(&mut buffer).await { }
+        while let Ok(length) = stream_read.read(&mut buffer).await {
+            if length == 0 {
+                break;
+            }
+        }
 
         // destroy local subscriber reference
         {
