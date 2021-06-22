@@ -86,7 +86,7 @@ impl Publisher {
                                 let mut state = self.state.lock().await;
                                 state.subs = subs;
                                 for (id,s) in state.subs.iter() {
-                                    println!("new subscriber {:016X} found at {}",id,s.address);
+                                    println!("subscriber {:016X} found at {}",id,s.address);
                                 }
                             },
                             PartToPub::InitFailed => {
