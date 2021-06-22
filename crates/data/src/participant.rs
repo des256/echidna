@@ -599,6 +599,8 @@ impl Participant {
                     // peer has new publisher
                     PeerToPeer::NewPub(id,publisher) => {
                         println!("NewPub");
+
+                        // create remote publisher reference
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.insert(id,publisher);
@@ -607,6 +609,8 @@ impl Participant {
                     // peer lost publisher
                     PeerToPeer::DropPub(id) => {
                         println!("DropPub");
+
+                        // remove remote publisher reference
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.pubs.remove(&id);
@@ -615,19 +619,38 @@ impl Participant {
                     // peer has new subscriber
                     PeerToPeer::NewSub(id,subscriber) => {
                         println!("NewSub");
+
+                        // inform relevant local pubs about new subscriber
+                        let mut state_pubs = self.pubs.lock().await;
+                        for (_,p) in state_pubs.iter_mut() {
+                            if p.topic == subscriber.topic {
+                                send_message(&mut p.stream,PartToPub::NewSub(id,subscriber.clone())).await;
+                            }
+                        }
+
+                        // create remote subscriber reference
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
                         peer.subs.insert(id,subscriber);
-                        // TODO: all local pubs with same topic: PartToPub::NewSub
                     },
 
                     // peer lost subscriber
                     PeerToPeer::DropSub(id) => {
                         println!("DropSub");
+
+                        // remove remote subscriber reference (but keep topic)
                         let mut state_peers = self.peers.lock().await;
                         let peer = state_peers.get_mut(&peer_id).expect(&format!("cannot find participant reference {:016X}",peer_id));
+                        let topic = peer.subs.get(&id).unwrap().topic.clone();
                         peer.subs.remove(&id);
-                        // TODO: all local pubs with same topic: PartToPub::DropSub
+
+                        // inform relevant local pubs about lost subscriber
+                        let mut state_pubs = self.pubs.lock().await;
+                        for (_,p) in state_pubs.iter_mut() {
+                            if p.topic == topic {
+                                send_message(&mut p.stream,PartToPub::DropSub(id)).await;
+                            }
+                        }
                     },
                 }
             }

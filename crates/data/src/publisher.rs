@@ -84,8 +84,14 @@ impl Publisher {
                             println!("    subscriber {:016X} at {} for topic \"{}\"",id,s.address,s.topic);
                         }
                     },
-                    _ => {
-                        println!("TODO: some other message...");
+                    PartToPub::InitFailed => {
+                        panic!("publisher initialization failed!");
+                    },
+                    PartToPub::NewSub(id,subscriber) => {
+                        println!("new subscriber {:016X} at {}",id,subscriber.address);
+                    },
+                    PartToPub::DropSub(id) => {
+                        println!("subscriber {:016X} lost",id);
                     },
                 }
             }
