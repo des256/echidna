@@ -119,7 +119,7 @@ impl Subscriber {
 
         loop {
 
-            // receive header + data
+            // receive heartbeat or chunk
             let (_,address) = self.socket.recv_from(&mut buffer).await.expect("error receiving");
 
             if let Some((_,pts)) = PubToSub::decode(&buffer) {
@@ -151,7 +151,7 @@ impl Subscriber {
                         }
                     },
 
-                    // incoming chunk
+                    // chunk
                     PubToSub::Chunk(chunk) => {
 
                         let mut state = self.state.lock().await;
