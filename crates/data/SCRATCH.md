@@ -20,11 +20,16 @@ This starts a participant on the local machine.
 
 - DONE: Send tiny messages, fitting inside one chunk.
 - DONE: Have subscriber report if chunk arrived. If not, resend.
-- Send larger messages.
+- DONE: Send larger messages.
+- Improve retransmit system.
 
 Examples: hello_pub.rs, hello_sub.rs
 
 These are publisher and subscriber for the ```/hello``` topic.
+
+### Retransmits
+
+- IDEA: subscriber responds to each chunk by sending back an acknowledgement.
 
 ### Shared Memory
 
