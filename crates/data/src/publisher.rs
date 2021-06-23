@@ -225,13 +225,6 @@ impl Publisher {
 
             for (sid,success) in state.success.iter() {
 
-                println!("success for {:016X}:",sid);
-                let mut index = 0usize;
-                for s in success.iter() {
-                    println!("    {}: {}",index,s);
-                    index += 1;
-                }
-
                 // figure out if everything was sent
                 let mut complete = true;
                 for s in success.iter() {
@@ -241,7 +234,7 @@ impl Publisher {
                     }
                 }
 
-                println!("complete: {}",complete);
+                println!("{:016X} complete: {}",sid,complete);
 
                 // if not, send heartbeat to this subscriber
                 if !complete {
@@ -253,7 +246,7 @@ impl Publisher {
             }
 
             // and wait a really tiny bit before trying again
-            time::sleep(Duration::from_micros(1)).await;
+            time::sleep(Duration::from_micros(10)).await;
         }
     }
 
