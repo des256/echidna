@@ -154,6 +154,12 @@ impl Subscriber {
                                 SubToPub::Resend(self.id,id,indices).encode(&mut send_buffer);
                                 self.socket.send_to(&mut send_buffer,address).await.expect("error sending acknowledgement");
                             }
+                            else {
+                                println!("no more resends needed");
+                                let mut send_buffer = Vec::<u8>::new();
+                                SubToPub::Resend(self.id,id,Vec::<u32>::new()).encode(&mut send_buffer);
+                                self.socket.send_to(&mut send_buffer,address).await.expect("error sending acknowledgement");
+                            }
                         }
                     },
 
