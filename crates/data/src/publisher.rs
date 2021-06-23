@@ -214,7 +214,7 @@ impl Publisher {
         }
 
         // send heartbeats until everything is transmitted successfully
-        let mut done = true;
+        let mut done = false;
         while !done {
 
             let state = self.state.lock().await;
@@ -225,6 +225,13 @@ impl Publisher {
 
             for (sid,success) in state.success.iter() {
 
+                println!("success for {:016X}:",sid);
+                let mut index = 0usize;
+                for s in success.iter() {
+                    println!("    {}: {}",index,s);
+                    index += 1;
+                }
+
                 // figure out if everything was sent
                 let mut complete = true;
                 for s in success.iter() {
@@ -233,6 +240,8 @@ impl Publisher {
                         break;
                     }
                 }
+
+                println!("complete: {}",complete);
 
                 // if not, send heartbeat to this subscriber
                 if !complete {
