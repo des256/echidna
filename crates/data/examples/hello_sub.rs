@@ -4,17 +4,16 @@ use {
         runtime,
         time,
     },
-    codec::Codec,
-    std::time::Duration,
+    std::{
+        time::Duration,
+        io::prelude::*,
+        fs,
+    },
 };
 
 fn on_message(buffer: &[u8]) {
-    if let Some((_,message)) = String::decode(&buffer) {
-        println!("message received: {}",message);
-    }
-    else {
-        println!("cannot decode message");
-    }
+    let mut file = fs::File::create("result.jpg").expect("cannot create file");
+    file.write_all(&buffer).expect("cannot write to file");
 }
 
 async fn async_main() {

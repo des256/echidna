@@ -134,6 +134,8 @@ impl Subscriber {
                         // only respond if this is for the current message
                         if id == state.id {
 
+                            println!("received heartbeat");
+
                             // collect missing indices
                             let mut indices = Vec::<u32>::new();
                             for i in 0..state.received.len() {
@@ -144,6 +146,10 @@ impl Subscriber {
 
                             // request resend
                             if indices.len() != 0 {
+                                println!("requesting resends for:");
+                                for index in indices.iter() {
+                                    println!("    {}",index);
+                                }
                                 let mut send_buffer = Vec::<u8>::new();
                                 SubToPub::Resend(self.id,id,indices).encode(&mut send_buffer);
                                 self.socket.send_to(&mut send_buffer,address).await.expect("error sending acknowledgement");
@@ -155,6 +161,8 @@ impl Subscriber {
                     PubToSub::Chunk(chunk) => {
 
                         let mut state = self.state.lock().await;
+
+                        println!("received chunk {} for message {:016X}",chunk.index,chunk.id);
 
                         // if this is a new chunk, reset state
                         if chunk.id != state.id {
@@ -182,6 +190,7 @@ impl Subscriber {
 
                         // if all chunks received, pass to callback
                         if complete {
+                            println!("all chunks received");
                             on_data(&state.buffer);
                         }
                     },

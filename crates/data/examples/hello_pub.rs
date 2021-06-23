@@ -3,24 +3,24 @@ use {
     tokio::{
         runtime,
         time,
+        fs,
+        io::AsyncReadExt,
     },
-    codec::Codec,
     std::time::Duration,
 };
 
 async fn async_main() {
 
+    // prepare message
+    let mut file = fs::File::open("test.jpg").await.expect("cannot open file");
+    let mut buffer = Vec::<u8>::new();
+    file.read_to_end(&mut buffer).await.expect("cannot read file");
+
     // create hello publisher
     let publisher = Publisher::new("/hello").await;
 
-    // prepare message (string for now)
-    let message = "Hello!".to_string();
-    let mut buffer = Vec::<u8>::new();
-    message.encode(&mut buffer);
-
     // publish message every 5 seconds
     loop {
-        println!("sending message: {}",message);
         publisher.send(&buffer).await;
         
         time::sleep(Duration::from_secs(5)).await;

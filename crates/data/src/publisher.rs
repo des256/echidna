@@ -146,6 +146,7 @@ impl Publisher {
         if (total_bytes % CHUNK_SIZE) != 0 {
             total += 1;
         }
+        println!("sending message of {} bytes in {} chunks",total_bytes,total);
         
         // prepare new message
         let id = rand::random::<u64>();
@@ -201,6 +202,7 @@ impl Publisher {
         }
 
         // send all chunks to all subscribers once
+        println!("sending all chunks to all subscribers");
         {
             let state = self.state.lock().await;
             let state_subs = self.subs.lock().await;
@@ -234,6 +236,7 @@ impl Publisher {
 
                 // if not, send heartbeat to this subscriber
                 if !complete {
+                    println!("send heartbeat to {:016X}",sid);
                     let s = state_subs.get(&sid).unwrap();
                     self.socket.send_to(&send_buffer,s.address).await.expect("error sending heartbeat");
                     done = false;
@@ -264,6 +267,11 @@ impl Publisher {
                         // make sure this is about the current message
                         if id == state.id {
 
+                            println!("{:016X} wants more chunks:",sid);
+                            for index in indices.iter() {
+                                println!("    {}",index);
+                            }
+
                             // log which chunks were successfully transmitted
                             let total = state.chunks.len();
                             let success = state.success.get_mut(&sid).unwrap();
@@ -276,6 +284,7 @@ impl Publisher {
 
                             // retransmit requested chunks
                             for index in indices.iter() {
+                                println!("sending chunk {} to {:016X}",index,sid);
                                 self.socket.send_to(&state.chunks[*index as usize],address).await.expect("error resending data chunk");
                             }
                         }
