@@ -53,3 +53,5 @@ For two RGB cameras, this becomes a lot harder. One idea is to train a neural ne
 #### 3. RGB-D and RGB camera
 
 Extract the point cloud from the RGB-D camera, and estimate the camera pose of the other camera by reducing some metric in NLS.
+
+### Look better at existing research

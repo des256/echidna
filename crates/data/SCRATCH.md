@@ -29,7 +29,15 @@ These are publisher and subscriber for the ```/hello``` topic.
 
 ### Retransmits
 
-- IDEA: subscriber responds to each chunk by sending back an acknowledgement.
+Learn about other reliable UDP systems to find a better pattern.
+
+- IDEA: after having received N chunks, the subscriber sends back acknowledgements of those chunks. publisher records this. after having sent everything, publisher periodically resends anything that wasn't acknowledged.
+
+- IDEA: publisher sends N chunks, followed by a heartbeat, followed by N chunks, etc. subscriber responds to the heartbeats with acknowledgements. separate process of publisher listens to incoming acknowledgements and records them. After first process is done sending the chunks, it starts resending missing N chunks, followed by a heartbeat, etc. ==> let's try this.
+
+There are many parameters to play with and many delay strategies. This might take a few more days.
+
+I did not follow a quick hunch that TCP would be easier.
 
 ### Shared Memory
 

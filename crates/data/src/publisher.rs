@@ -18,18 +18,24 @@ use {
     },
 };
 
+pub struct SubscriberControl {
+    pub address: SocketAddr,
+    pub done: bool,
+}
+
 pub struct PublisherState {
-    pub id: DataId,
+    pub id: MessageId,
     pub chunks: Vec<Vec<u8>>,
-    pub success: HashMap<SubId,Vec<bool>>,
+    pub subs: HashMap<SubscriberId,SubscriberRef>,
 }
 
 pub struct Publisher {
-    pub id: PubId,
+    pub id: PublisherId,
     pub topic: String,
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
-    pub subs: Mutex<HashMap<SubId,SubRef>>,
+    pub subs: Mutex<HashMap<SubscriberId,SubscriberRef>>,
+    pub success: Mutex<HashMap<SubscriberId,Vec<bool>>>,
     pub state: Mutex<PublisherState>,
 }
 
@@ -50,10 +56,11 @@ impl Publisher {
             socket: socket,
             address: address,
             subs: Mutex::new(HashMap::new()),
+            success: Mutex::new(HashMap::new()),
             state: Mutex::new(PublisherState {
                 id: 0,
                 chunks: Vec::new(),
-                success: HashMap::new(),
+                subs: HashMap::new(),
             }),
         });
 
@@ -63,10 +70,10 @@ impl Publisher {
             this.run_participant_connection().await;
         });
 
-        // spawn resend request handler
+        // spawn acknowledgement handler
         let this = Arc::clone(&publisher);
         task::spawn(async move {
-            this.run_resend_handler().await;
+            this.run_ack_handler().await;
         });
 
         println!("publisher {:016X} of \"{}\" running at port {}",id,topic,address.port());
@@ -82,7 +89,7 @@ impl Publisher {
             if let Ok(mut stream) = net::TcpStream::connect("0.0.0.0:7332").await {
 
                 // announce publisher to participant
-                send_message(&mut stream,ToPart::InitPub(self.id,PubRef {
+                send_message(&mut stream,ToParticipant::InitPub(self.id,PublisherRef {
                     topic: self.topic.clone(),
                 })).await;
 
@@ -92,24 +99,24 @@ impl Publisher {
                     if length == 0 {
                         break;
                     }
-                    if let Some((_,message)) = PartToPub::decode(&recv_buffer) {
+                    if let Some((_,message)) = ParticipantToPublisher::decode(&recv_buffer) {
                         match message {
-                            PartToPub::Init(subs) => {
+                            ParticipantToPublisher::Init(subs) => {
                                 let mut state_subs = self.subs.lock().await;
                                 *state_subs = subs;
                                 for (id,s) in state_subs.iter() {
                                     println!("subscriber {:016X} found at {}",id,s.address);
                                 }
                             },
-                            PartToPub::InitFailed => {
+                            ParticipantToPublisher::InitFailed => {
                                 panic!("publisher initialization failed!");
                             },
-                            PartToPub::NewSub(id,subscriber) => {
+                            ParticipantToPublisher::NewSub(id,subscriber) => {
                                 println!("subscriber {:016X} found at {}",id,subscriber.address);
                                 let mut state_subs = self.subs.lock().await;
                                 state_subs.insert(id,subscriber);
                             },
-                            PartToPub::DropSub(id) => {
+                            ParticipantToPublisher::DropSub(id) => {
                                 let mut state_subs = self.subs.lock().await;
                                 state_subs.remove(&id);
                                 println!("subscriber {:016X} lost",id);
@@ -140,6 +147,15 @@ impl Publisher {
             }
         }
 
+        // TODO: cancel whatever send is currently happening
+
+        // copy current subscriber state
+        {
+            let state_subs = self.subs.lock().await;
+            let mut state = self.state.lock().await;
+            state.subs = state_subs.clone();
+        }
+
         // calculate number of chunks for this message
         let total_bytes = message.len();
         let mut total = (total_bytes / CHUNK_SIZE) as u32;
@@ -148,11 +164,12 @@ impl Publisher {
         }
         println!("sending message of {} bytes in {} chunks",total_bytes,total);
         
-        // prepare new message
+        // prepare chunks
         let id = rand::random::<u64>();
 
         {
             let mut state = self.state.lock().await;
+            let mut success = self.success.lock().await;
 
             // initialize
             state.id = id;
@@ -183,7 +200,7 @@ impl Publisher {
 
                 // encode
                 let mut buffer = Vec::<u8>::new();
-                PubToSub::Chunk(chunk).encode(&mut buffer);
+                PublisherToSubscriber::Chunk(chunk).encode(&mut buffer);
 
                 // store
                 state.chunks.push(buffer);
@@ -194,100 +211,114 @@ impl Publisher {
             }
 
             // initialize success loggers
-            state.success = HashMap::new();
-            let state_subs = self.subs.lock().await;
-            for (id,_) in state_subs.iter() {
-                state.success.insert(*id,vec![false; total as usize]);
+            success.clear();
+            for (id,_) in state.subs.iter() {
+                success.insert(*id,vec![false; total as usize]);
             }
         }
 
-        // send all chunks to all subscribers once
-        println!("sending all chunks to all subscribers");
+        // send all chunks
+        println!("sending a bunch of chunks to all subscribers:");
         {
             let state = self.state.lock().await;
-            let state_subs = self.subs.lock().await;
+            let mut index = 0usize;
             for send_buffer in state.chunks.iter() {
-                for (_,s) in state_subs.iter() {
+                println!("sending chunk {} to all subscribers",index);
+                for (_,s) in state.subs.iter() {
                     self.socket.send_to(send_buffer,s.address).await.expect("error sending data chunk");
+                }
+                index += 1;
+                if index >= CHUNKS_PER_INITIAL_BURST {
+                    break;
                 }
             }
         }
 
-        // send heartbeats until everything is transmitted successfully
+        // retransmit missing chunks
+        println!("done, retransmiting now...");
+
+        // make copy of subscriber list
+        let mut subs = HashMap::<SubscriberId,SubscriberControl>::new();
+        {
+            let state = self.state.lock().await;
+            for (sid,s) in state.subs.iter() {
+                subs.insert(*sid,SubscriberControl {
+                    address: s.address,
+                    done: false,
+                });
+            }
+        }
         let mut done = false;
         while !done {
 
-            let state = self.state.lock().await;
-            let state_subs = self.subs.lock().await;
+            // wait a really tiny bit before trying again
+            time::sleep(Duration::from_micros(RETRANSMIT_DELAY_USEC as u64)).await;
 
+            // send heartbeat to all subscribers that still need one
             let mut send_buffer = Vec::<u8>::new();
-            PubToSub::Heartbeat(id).encode(&mut send_buffer);
-
-            for (sid,success) in state.success.iter() {
-
-                // figure out if everything was sent
-                let mut complete = true;
-                for s in success.iter() {
-                    if !s {
-                        complete = false;
-                        break;
-                    }
-                }
-
-                println!("{:016X} complete: {}",sid,complete);
-
-                // if not, send heartbeat to this subscriber
-                if !complete {
-                    println!("send heartbeat to {:016X}",sid);
-                    let s = state_subs.get(&sid).unwrap();
+            PublisherToSubscriber::Heartbeat(id).encode(&mut send_buffer);
+            for (_,s) in subs.iter() {
+                if !s.done {
                     self.socket.send_to(&send_buffer,s.address).await.expect("error sending heartbeat");
-                    done = false;
                 }
             }
 
-            // and wait a really tiny bit before trying again
-            time::sleep(Duration::from_micros(10)).await;
+            // if everything was sent, call it a day
+            done = true;
+            let state_success = self.success.lock().await;
+            for (_,success) in state_success.iter() {
+                for s in success {
+                    if !s {
+                        done = false;
+                        break;
+                    }
+                }
+                if !done {
+                    break;
+                }
+            }
         }
+
+        println!("everything sent successfully");
     }
 
-    pub async fn run_resend_handler(self: &Arc<Publisher>) {
+    pub async fn run_ack_handler(self: &Arc<Publisher>) {
 
         let mut buffer = vec![0u8; 65536];
 
         loop {
 
-            // receive resend request
             let (_,address) = self.socket.recv_from(&mut buffer).await.expect("error receiving");
 
-            if let Some((_,stp)) = SubToPub::decode(&buffer) {
+            if let Some((_,stp)) = SubscriberToPublisher::decode(&buffer) {
                 match stp {
 
-                    SubToPub::Resend(sid,id,indices) => {
+                    SubscriberToPublisher::Ack(sid,id,indices) => {
 
-                        let mut state = self.state.lock().await;
-
-                        // make sure this is about the current message
+                        let state = self.state.lock().await;
                         if id == state.id {
 
-                            println!("{:016X} wants more chunks:",sid);
+                            let mut state_success = self.success.lock().await;
+                            let success = state_success.get_mut(&sid).unwrap();
+    
+                            println!("{:016X} acknowledges chunks:",sid);
                             for index in indices.iter() {
                                 println!("    {}",index);
+                                success[*index as usize] = true;
                             }
+                        }
+                    },
 
-                            // log which chunks were successfully transmitted
-                            let total = state.chunks.len();
-                            let success = state.success.get_mut(&sid).unwrap();
-                            *success = vec![true; total];
-                            for index in indices.iter() {
-                                if *index < total as u32 {
-                                    success[*index as usize] = false;
-                                }
-                            }
+                    SubscriberToPublisher::NAck(sid,id,indices) => {
 
-                            // retransmit requested chunks
+                        let state = self.state.lock().await;
+                        if id == state.id {
+
+                            println!("{:016X} wants retransmit of chunks:",sid);
                             for index in indices.iter() {
-                                println!("sending chunk {} to {:016X}",index,sid);
-                                self.socket.send_to(&state.chunks[*index as usize],address).await.expect("error resending data chunk");
+                                println!("    {}",index);
+                                println!("retransmitting chunk {} to {:016X}",index,sid);
+                                self.socket.send_to(&state.chunks[*index as usize],address).await.expect("error retransmitting chunk");
                             }
                         }
                     },

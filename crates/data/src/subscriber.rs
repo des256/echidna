@@ -18,13 +18,13 @@ use {
 };
 
 pub struct SubscriberState {
-    id: DataId,
+    id: MessageId,
     buffer: Vec<u8>,
     received: Vec<bool>,
 }
 
 pub struct Subscriber {
-    pub id: PubId,
+    pub id: PublisherId,
     pub topic: String,
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
@@ -79,7 +79,7 @@ impl Subscriber {
             if let Ok(mut stream) = net::TcpStream::connect("0.0.0.0:7332").await {
 
                 // announce subscriber to participant
-                send_message(&mut stream,ToPart::InitSub(self.id,SubRef {
+                send_message(&mut stream,ToParticipant::InitSub(self.id,SubscriberRef {
                     address: self.address,
                     topic: self.topic.clone(),
                 })).await;
@@ -90,10 +90,10 @@ impl Subscriber {
                     if length == 0 {
                         break;
                     }
-                    if let Some((_,message)) = PartToSub::decode(&recv_buffer) {
+                    if let Some((_,message)) = ParticipantToSubscriber::decode(&recv_buffer) {
                         match message {
-                            PartToSub::Init => { },
-                            PartToSub::InitFailed => {
+                            ParticipantToSubscriber::Init => { },
+                            ParticipantToSubscriber::InitFailed => {
                                 panic!("publisher initialization failed!");
                             },
                         }
@@ -117,17 +117,20 @@ impl Subscriber {
 
         let mut buffer = vec![0u8; 65536];
 
+        let mut ack_count = 0usize;
+        let mut ack_indices = Vec::<u32>::new();
+
         loop {
 
             // receive heartbeat or chunk
             let (_,address) = self.socket.recv_from(&mut buffer).await.expect("error receiving");
 
-            if let Some((_,pts)) = PubToSub::decode(&buffer) {
+            if let Some((_,pts)) = PublisherToSubscriber::decode(&buffer) {
 
                 match pts {
 
-                    // Heartbeat
-                    PubToSub::Heartbeat(id) => {
+                    // Heartbeat, respond with NAck
+                    PublisherToSubscriber::Heartbeat(id) => {
 
                         let state = self.state.lock().await;
 
@@ -138,66 +141,85 @@ impl Subscriber {
 
                             // collect missing indices
                             let mut indices = Vec::<u32>::new();
-                            for i in 0..state.received.len() {
-                                if !state.received[i] {
-                                    indices.push(i as u32);
+                            for _ in 0..CHUNKS_PER_NACK {
+                                loop {
+                                    let index = rand::random::<usize>() % state.received.len();
+                                    if !state.received[index] {
+                                        indices.push(index as u32);
+                                        break;
+                                    }
                                 }
                             }
 
-                            // request resend
+                            // request retransmit
                             if indices.len() != 0 {
                                 println!("requesting resends for:");
                                 for index in indices.iter() {
                                     println!("    {}",index);
                                 }
                                 let mut send_buffer = Vec::<u8>::new();
-                                SubToPub::Resend(self.id,id,indices).encode(&mut send_buffer);
-                                self.socket.send_to(&mut send_buffer,address).await.expect("error sending acknowledgement");
-                            }
-                            else {
-                                println!("no more resends needed");
-                                let mut send_buffer = Vec::<u8>::new();
-                                SubToPub::Resend(self.id,id,Vec::<u32>::new()).encode(&mut send_buffer);
-                                self.socket.send_to(&mut send_buffer,address).await.expect("error sending acknowledgement");
+                                SubscriberToPublisher::NAck(self.id,id,indices).encode(&mut send_buffer);
+                                self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
                             }
                         }
                     },
 
                     // chunk
-                    PubToSub::Chunk(chunk) => {
+                    PublisherToSubscriber::Chunk(chunk) => {
 
                         let mut state = self.state.lock().await;
-
-                        println!("received chunk {} for message {:016X}",chunk.index,chunk.id);
 
                         // if this is a new chunk, reset state
                         if chunk.id != state.id {
                             state.id = chunk.id;
                             state.buffer = vec![0; chunk.total_bytes as usize];
                             state.received = vec![false; chunk.total as usize];
+                            ack_count = 0;
                         }
 
-                        // copy data into final message buffer
-                        let start = chunk.index as usize * CHUNK_SIZE;
-                        let end = start + chunk.data.len();
-                        state.buffer[start..end].copy_from_slice(&chunk.data);
+                        println!("received chunk {}",chunk.index);
 
-                        // mark the chunk as received
-                        state.received[chunk.index as usize] = true;
+                        // if we don't already have this chunk
+                        if !state.received[chunk.index as usize] {
 
-                        // verify if all chunks are received
-                        let mut complete = true;
-                        for received in state.received.iter() {
-                            if !received {
-                                complete = false;
-                                break;
+                            // copy data into final message buffer
+                            let start = chunk.index as usize * CHUNK_SIZE;
+                            let end = start + chunk.data.len();
+                            state.buffer[start..end].copy_from_slice(&chunk.data);
+
+                            // mark the chunk as received
+                            state.received[chunk.index as usize] = true;
+
+                            // verify if all chunks are received
+                            let mut complete = true;
+                            for received in state.received.iter() {
+                                if !received {
+                                    complete = false;
+                                    break;
+                                }
                             }
-                        }
 
-                        // if all chunks received, pass to callback
-                        if complete {
-                            println!("all chunks received");
-                            on_data(&state.buffer);
+                            // if all chunks received, pass to callback
+                            if complete {
+                                println!("all chunks received");
+                                on_data(&state.buffer);
+                            }
+
+                            // register for the next ack
+                            ack_indices.push(chunk.index);
+
+                            ack_count += 1;
+                            if ack_count > CHUNKS_PER_ACK {
+                                println!("sending acknowledgement for chunks:");
+                                for index in ack_indices.iter() {
+                                    println!("    {}",index);
+                                }
+                                let mut send_buffer = Vec::<u8>::new();
+                                SubscriberToPublisher::Ack(self.id,chunk.id,ack_indices).encode(&mut send_buffer);
+                                self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
+                                ack_indices = Vec::<u32>::new();
+                                ack_count = 0;
+                            }
                         }
                     },
                 }

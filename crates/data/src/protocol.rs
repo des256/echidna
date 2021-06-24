@@ -14,15 +14,25 @@ use {
 
 pub const CHUNK_SIZE: usize = 16384;
 
-pub type DataId = u64;
-pub type PeerId = u64;
-pub type PubId = u64;
-pub type SubId = u64;
+pub const CHUNKS_PER_HEARTBEAT: usize = 16;
+
+pub const CHUNKS_PER_ACK: usize = 8;
+
+pub const CHUNKS_PER_NACK: usize = 8;
+
+pub const RETRANSMIT_DELAY_USEC: usize = 100;
+
+pub const CHUNKS_PER_INITIAL_BURST: usize = 8;
+
+pub type MessageId = u64;
+pub type ParticipantId = u64;
+pub type PublisherId = u64;
+pub type SubscriberId = u64;
 
 #[derive(Codec)]
 pub struct Chunk {
     pub ts: u64,
-    pub id: DataId,
+    pub id: MessageId,
     pub total_bytes: u64,
     pub total: u32,
     pub index: u32,
@@ -30,64 +40,65 @@ pub struct Chunk {
 }
 
 #[derive(Codec)]
-pub enum PubToSub {
-    Heartbeat(DataId),
+pub enum PublisherToSubscriber {
+    Heartbeat(MessageId),
     Chunk(Chunk),
 }
 
 #[derive(Codec)]
-pub enum SubToPub {
-    Resend(SubId,DataId,Vec<u32>),
+pub enum SubscriberToPublisher {
+    Ack(SubscriberId,MessageId,Vec<u32>),
+    NAck(SubscriberId,MessageId,Vec<u32>),
 }
 
 #[derive(Codec)]
 pub struct Beacon {
-    pub id: PeerId,
+    pub id: ParticipantId,
     pub port: u16,
 }
 
 #[derive(Clone,Codec)]
-pub struct PubRef {
+pub struct PublisherRef {
     pub topic: String,
 }
 
 #[derive(Clone,Codec)]
-pub struct SubRef {
+pub struct SubscriberRef {
     pub address: SocketAddr,
     pub topic: String,
 }
 
 #[derive(Codec)]
-pub struct PeerAnnounce {
-    pub id: PeerId,
-    pub pubs: HashMap<PubId,PubRef>,
-    pub subs: HashMap<SubId,SubRef>,
+pub struct ParticipantAnnounce {
+    pub id: ParticipantId,
+    pub pubs: HashMap<PublisherId,PublisherRef>,
+    pub subs: HashMap<SubscriberId,SubscriberRef>,
 }
 
 #[derive(Codec)]
-pub enum PeerToPeer {
-    NewPub(PubId,PubRef),
-    DropPub(PubId),
-    NewSub(SubId,SubRef),
-    DropSub(SubId),
+pub enum ParticipantToParticipant {
+    NewPub(PublisherId,PublisherRef),
+    DropPub(PublisherId),
+    NewSub(SubscriberId,SubscriberRef),
+    DropSub(SubscriberId),
 }
 
 #[derive(Codec)]
-pub enum ToPart {
-    InitPub(PubId,PubRef),
-    InitSub(SubId,SubRef),
+pub enum ToParticipant {
+    InitPub(PublisherId,PublisherRef),
+    InitSub(SubscriberId,SubscriberRef),
 }
 
 #[derive(Codec)]
-pub enum PartToPub {
-    Init(HashMap<SubId,SubRef>),
+pub enum ParticipantToPublisher {
+    Init(HashMap<SubscriberId,SubscriberRef>),
     InitFailed,
-    NewSub(SubId,SubRef),
-    DropSub(SubId),
+    NewSub(SubscriberId,SubscriberRef),
+    DropSub(SubscriberId),
 }
 
 #[derive(Codec)]
-pub enum PartToSub {
+pub enum ParticipantToSubscriber {
     Init,
     InitFailed,
 }
