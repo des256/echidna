@@ -14,15 +14,7 @@ use {
 
 pub const CHUNK_SIZE: usize = 16384;
 
-pub const CHUNKS_PER_HEARTBEAT: usize = 16;
-
-pub const CHUNKS_PER_ACK: usize = 8;
-
-pub const CHUNKS_PER_NACK: usize = 8;
-
-pub const RETRANSMIT_DELAY_USEC: usize = 100;
-
-pub const CHUNKS_PER_INITIAL_BURST: usize = 8;
+pub const CHUNKS_PER_HEARTBEAT: usize = 7;
 
 pub type MessageId = u64;
 pub type ParticipantId = u64;
@@ -47,8 +39,7 @@ pub enum PublisherToSubscriber {
 
 #[derive(Codec)]
 pub enum SubscriberToPublisher {
-    Ack(SubscriberId,MessageId,Vec<u32>),
-    NAck(SubscriberId,MessageId,Vec<u32>),
+    Ack(MessageId,Vec<u32>),
 }
 
 #[derive(Codec)]
