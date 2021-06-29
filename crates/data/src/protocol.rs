@@ -12,9 +12,9 @@ use {
     },
 };
 
-pub const CHUNK_SIZE: usize = 16384;
-
-pub const CHUNKS_PER_HEARTBEAT: usize = 7;
+pub const CHUNK_SIZE: usize = 32768;
+pub const CHUNKS_PER_HEARTBEAT: usize = 2;  // play with this later
+pub const RETRANSMIT_TIMEOUT_USEC: u64 = 10000;
 
 pub type MessageId = u64;
 pub type ParticipantId = u64;

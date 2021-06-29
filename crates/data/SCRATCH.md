@@ -33,11 +33,17 @@ Learn about other reliable UDP systems to find a better pattern.
 
 - IDEA: after having received N chunks, the subscriber sends back acknowledgements of those chunks. publisher records this. after having sent everything, publisher periodically resends anything that wasn't acknowledged.
 
+Fails miserably on local loopback. Most chunks are lost and retransmitted at insane rates.
+
 - IDEA: publisher sends N chunks, followed by a heartbeat, followed by N chunks, etc. subscriber responds to the heartbeats with acknowledgements. separate process of publisher listens to incoming acknowledgements and records them. After first process is done sending the chunks, it starts resending missing N chunks, followed by a heartbeat, etc. ==> let's try this.
 
-There are many parameters to play with and many delay strategies. This might take a few more days.
+Fails similarly miserable on local loopback. Most chunks are lost and retransmitted at insane rates.
 
-I did not follow a quick hunch that TCP would be easier.
+There are many parameters to play with and many delay strategies. This might take a few more days. Also, let's read up on strategies in other protocols (what about TCP?) to see if we can Frankencopy something.
+
+- IDEA: implement something similar to TCP, but stuff more chunks inside RTO. publisher sends N chunks, followed by heartbeat, subscriber acknowledges heartbeat only, if acknowledgement arrives before RTO, publisher calculates new RTT, derives new RTO, sends next N chunks, of which some might be retransmits, etc. until entire message is sent. If acknowledgement does not arrive, publisher retransmits same N chunks, followed by heartbeat. RTT is calculated from heartbeat sending to acknowledgement arrival, RTO is RTT + some constant.
+
+Works very well on local loopback, with small N (< 7). Larger means the heartbeat gets lost.
 
 ### Shared Memory
 

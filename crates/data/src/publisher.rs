@@ -218,7 +218,7 @@ impl Publisher {
 
                     // wait for acknowledgement or RTO timeout
                     let mut buffer = vec![0u8; 65536];
-                    let rto = Duration::from_micros(1000000);  // take fixed RTO for now
+                    let rto = Duration::from_micros(RETRANSMIT_TIMEOUT_USEC);
                     if let Ok(_) = time::timeout(rto,subscriber.socket.recv_from(&mut buffer)).await {
                         if let Some((_,stp)) = SubscriberToPublisher::decode(&buffer) {
                             match stp {
