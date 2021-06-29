@@ -21,7 +21,7 @@ This starts a participant on the local machine.
 - DONE: Send tiny messages, fitting inside one chunk.
 - DONE: Have subscriber report if chunk arrived. If not, resend.
 - DONE: Send larger messages.
-- Improve retransmit system.
+- DONE: Improve retransmit system.
 
 Examples: hello_pub.rs, hello_sub.rs
 
@@ -43,7 +43,7 @@ There are many parameters to play with and many delay strategies. This might tak
 
 - IDEA: implement something similar to TCP, but stuff more chunks inside RTO. publisher sends N chunks, followed by heartbeat, subscriber acknowledges heartbeat only, if acknowledgement arrives before RTO, publisher calculates new RTT, derives new RTO, sends next N chunks, of which some might be retransmits, etc. until entire message is sent. If acknowledgement does not arrive, publisher retransmits same N chunks, followed by heartbeat. RTT is calculated from heartbeat sending to acknowledgement arrival, RTO is RTT + some constant.
 
-Works very well on local loopback, with small N (< 7). Larger means the heartbeat gets lost.
+Works very well on local loopback, with small N (< 7). Larger means the heartbeat gets lost (it appears subscriber-side IP rcvbuf is too small). Assume that very small N (2?) will work for now.
 
 ### Shared Memory
 
@@ -59,7 +59,7 @@ If possible/sensible see if managing multicast networks works.
 - Windows
 - MacOS
 - Android
-- iOS
+- DOING: iOS
 
 ### More Features
 
