@@ -6,7 +6,7 @@ crates.
 
 ## math
 
-Basic mathematics, vector and matrix calculus and SIMD data types.
+Basic mathematics, vector and matrix calculus and SIMD data types. Probably use `nalgebra` for this.
 
 ## codec
 
