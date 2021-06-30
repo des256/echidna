@@ -19,7 +19,7 @@ fn on_message(buffer: &[u8]) {
 async fn async_main() {
 
     // create and register hello subscriber
-    let _subscriber = Subscriber::new("/hello",on_message).await;
+    let _subscriber = Subscriber::new(7332,"office_test","/hello",on_message).await;
 
     // wait forever
     loop {

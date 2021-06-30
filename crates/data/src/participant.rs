@@ -43,7 +43,10 @@ pub struct LocalSubscriberRef {
 
 pub struct Participant {
     pub id: ParticipantId,
-    pub port: u16,
+    pub domain: String,
+    pub part_port: u16,
+    pub pubsub_port: u16,
+    pub beacon_port: u16,
     pub listener: net::TcpListener,
     pub peers: Mutex<HashMap<ParticipantId,PeerRef>>,
     pub pubs: Mutex<HashMap<PublisherId,LocalPublisherRef>>,
@@ -52,22 +55,25 @@ pub struct Participant {
 
 impl Participant {
 
-    pub async fn new() -> Arc<Participant> {
+    pub async fn new(pubsub_port: u16,beacon_port: u16,domain: &str) -> Arc<Participant> {
 
         // new ID
         let id = rand::random::<u64>();
 
         // create participant listener
         let part_listener = net::TcpListener::bind("0.0.0.0:0").await.expect("cannot bind participant listener socket");
-        let port = part_listener.local_addr().expect("cannot obtain local address of participant listener socket").port();
+        let part_port = part_listener.local_addr().expect("cannot obtain local address of participant listener socket").port();
 
         // create pub/sub listener
-        let listener = net::TcpListener::bind("0.0.0.0:7332").await.expect("cannot bind local listener socket");
+        let listener = net::TcpListener::bind(format!("0.0.0.0:{}",pubsub_port)).await.expect("cannot bind local listener socket");
 
         // new participant
         let participant = Arc::new(Participant {
             id: id,
-            port: port,
+            domain: domain.to_string(),
+            part_port: part_port,
+            pubsub_port: pubsub_port,
+            beacon_port: beacon_port,
             listener: listener,
             peers: Mutex::new(HashMap::new()),
             pubs: Mutex::new(HashMap::new()),
@@ -77,13 +83,13 @@ impl Participant {
         // spawn beacon broadcaster
         let this = Arc::clone(&participant);
         task::spawn(async move {
-            this.run_beacon_broadcaster().await;
+            this.run_beacon_broadcaster(beacon_port).await;
         });
 
         // spawn beacon receiver
         let this = Arc::clone(&participant);
         task::spawn(async move {
-            this.run_beacon_receiver().await;
+            this.run_beacon_receiver(beacon_port).await;
         });
 
         // spawn peer listener
@@ -101,7 +107,7 @@ impl Participant {
         participant
     }
 
-    async fn run_beacon_broadcaster(self: &Arc<Participant>) {
+    async fn run_beacon_broadcaster(self: &Arc<Participant>,beacon_port: u16) {
 
         // This task sends periodic beacon messages to anyone listening.
     
@@ -113,25 +119,26 @@ impl Participant {
             // broadcast beacon
             let beacon = Beacon {
                 id: self.id,
-                port: self.port,
+                domain: self.domain.clone(),
+                port: self.part_port,
             };
             let mut buffer: Vec<u8> = Vec::new();
             beacon.encode(&mut buffer);
-            socket.send_to(&buffer,("239.255.0.1",7331)).await.expect("cannot send beacon");
+            socket.send_to(&buffer,("239.255.0.1",beacon_port)).await.expect("cannot send beacon");
 
             // sleep until next tick
             time::sleep(Duration::from_secs(1)).await;
         }
     }
 
-    async fn run_beacon_receiver(self: &Arc<Participant>) {
+    async fn run_beacon_receiver(self: &Arc<Participant>,beacon_port: u16) {
     
         // This task receives beacons from peers, and in certain cases, establishes a connection.
 
         let mut buffer = vec![0u8; 65536];
 
         // create beacon receiver socket
-        let socket = net::UdpSocket::bind("0.0.0.0:7331").await.expect("cannot create beacon receiver socket");
+        let socket = net::UdpSocket::bind(format!("0.0.0.0:{}",beacon_port)).await.expect("cannot create beacon receiver socket");
         socket.join_multicast_v4(Ipv4Addr::new(239,255,0,1),Ipv4Addr::new(0,0,0,0)).expect("cannot join multicast group");            
 
         loop {
@@ -142,14 +149,14 @@ impl Participant {
             // decode beacon
             if let Some((_,beacon)) = Beacon::decode(&buffer) {
 
-                // if this is not a local echo
-                if beacon.id != self.id {
+                // if this is not a local echo, and it's the correct domain
+                if (beacon.id != self.id) && (beacon.domain == self.domain) {
 
                     // if peer not already known, and port number strict higher
                     if {
                         let state_peers = self.peers.lock().await;
                         if let None = state_peers.get(&beacon.id) {
-                            beacon.port < self.port
+                            beacon.port < self.part_port
                         }
                         else {
                             false
@@ -207,12 +214,12 @@ impl Participant {
                     if let Some((_,message)) = ToParticipant::decode(&buffer) {
                         match message {
 
-                            ToParticipant::InitPub(id,publisher) => {
-                                this.run_publisher(stream,id,publisher).await;
+                            ToParticipant::InitPub(id,domain,publisher) => {
+                                this.run_publisher(stream,id,domain,publisher).await;
                             },
 
-                            ToParticipant::InitSub(id,subscriber) => {
-                                this.run_subscriber(stream,id,subscriber).await;
+                            ToParticipant::InitSub(id,domain,subscriber) => {
+                                this.run_subscriber(stream,id,domain,subscriber).await;
                             },
                         }
                     }    
@@ -221,158 +228,178 @@ impl Participant {
         }
     }
 
-    async fn run_publisher(self: &Arc<Participant>,stream: net::TcpStream,id: PublisherId,publisher: PublisherRef) {
+    async fn run_publisher(self: &Arc<Participant>,stream: net::TcpStream,id: PublisherId,domain: String,publisher: PublisherRef) {
 
         // This task runs communication with the local publisher (currently no traffic).
 
-        // split stream read and write ends
-        let (mut stream_read,stream_write) = io::split(stream);
+        // make sure it's the same domain
+        if domain == self.domain {
 
-        // create local publisher reference
-        {
-            let mut state_pubs = self.pubs.lock().await;
-            state_pubs.insert(id,LocalPublisherRef {
-                stream: stream_write,
-                topic: publisher.topic.clone(),
-            });
-        }
+            // split stream read and write ends
+            let (mut stream_read,stream_write) = io::split(stream);
 
-        // initialize local publisher
-        let mut subs = HashMap::<SubscriberId,SubscriberRef>::new();
-        {
-            let state_subs = self.subs.lock().await;
-            for (id,s) in state_subs.iter() {
-                if s.topic == publisher.topic {
-                    subs.insert(*id,SubscriberRef {
-                        address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),s.address.port()),
-                        topic: s.topic.clone(),
-                    });
+            // create local publisher reference
+            {
+                let mut state_pubs = self.pubs.lock().await;
+                state_pubs.insert(id,LocalPublisherRef {
+                    stream: stream_write,
+                    topic: publisher.topic.clone(),
+                });
+            }
+
+            // initialize local publisher
+            let mut subs = HashMap::<SubscriberId,SubscriberRef>::new();
+            {
+                let state_subs = self.subs.lock().await;
+                for (id,s) in state_subs.iter() {
+                    if s.topic == publisher.topic {
+                        subs.insert(*id,SubscriberRef {
+                            address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),s.address.port()),
+                            topic: s.topic.clone(),
+                        });
+                    }
                 }
             }
-        }
-        {
-            let state_peers = self.peers.lock().await;
-            for (_,peer) in state_peers.iter() {
-                for (id,s) in &peer.subs {
-                    subs.insert(*id,SubscriberRef {
-                        address: SocketAddr::new(peer.ip,s.address.port()),
-                        topic: s.topic.clone(),
-                    });
+            {
+                let state_peers = self.peers.lock().await;
+                for (_,peer) in state_peers.iter() {
+                    for (id,s) in &peer.subs {
+                        subs.insert(*id,SubscriberRef {
+                            address: SocketAddr::new(peer.ip,s.address.port()),
+                            topic: s.topic.clone(),
+                        });
+                    }
                 }
             }
+            {
+                let mut state_pubs = self.pubs.lock().await;
+                let p = state_pubs.get_mut(&id).unwrap();
+                send_message(&mut p.stream,ParticipantToPublisher::Init(subs)).await;
+            }
+
+            // inform all peers of new publisher
+            {
+                let mut state_peers = self.peers.lock().await;
+                for (_,peer) in state_peers.iter_mut() {
+                    send_message(&mut peer.stream,ParticipantToParticipant::NewPub(id,publisher.clone())).await;
+                }
+            }
+
+            // wait for connection to break
+            let mut buffer = vec![0u8; 65536];
+            while let Ok(length) = stream_read.read(&mut buffer).await {
+                if length == 0 {
+                    break;
+                }
+            }
+
+            // inform all peers that publisher is lost
+            {
+                let mut state_peers = self.peers.lock().await;
+                for (_,peer) in state_peers.iter_mut() {
+                    send_message(&mut peer.stream,ParticipantToParticipant::DropPub(id)).await;
+                }
+            }
+
+            // destroy local publisher reference
+            {
+                let mut state_pubs = self.pubs.lock().await;
+                state_pubs.remove(&id);
+            }
         }
-        {
+        else {
+            // initialization failed
             let mut state_pubs = self.pubs.lock().await;
             let p = state_pubs.get_mut(&id).unwrap();
-            send_message(&mut p.stream,ParticipantToPublisher::Init(subs)).await;
-        }
-
-        // inform all peers of new publisher
-        {
-            let mut state_peers = self.peers.lock().await;
-            for (_,peer) in state_peers.iter_mut() {
-                send_message(&mut peer.stream,ParticipantToParticipant::NewPub(id,publisher.clone())).await;
-            }
-        }
-
-        // wait for connection to break
-        let mut buffer = vec![0u8; 65536];
-        while let Ok(length) = stream_read.read(&mut buffer).await {
-            if length == 0 {
-                break;
-            }
-        }
-
-        // inform all peers that publisher is lost
-        {
-            let mut state_peers = self.peers.lock().await;
-            for (_,peer) in state_peers.iter_mut() {
-                send_message(&mut peer.stream,ParticipantToParticipant::DropPub(id)).await;
-            }
-        }
-
-        // destroy local publisher reference
-        {
-            let mut state_pubs = self.pubs.lock().await;
-            state_pubs.remove(&id);
+            send_message(&mut p.stream,ParticipantToPublisher::InitFailed(PubInitFailed::DomainMismatch)).await;
         }
     }
 
-    async fn run_subscriber(self: &Arc<Participant>,stream: net::TcpStream,id: SubscriberId,subscriber: SubscriberRef) {
+    async fn run_subscriber(self: &Arc<Participant>,stream: net::TcpStream,id: SubscriberId,domain: String,subscriber: SubscriberRef) {
 
         // This task runs communication with the local subscriber.
 
-        // split stream read and write ends
-        let (mut stream_read,stream_write) = io::split(stream);
+        // make sure it's the same domain
+        if domain == self.domain {
 
-        // create local subscriber reference
-        {
-            let mut state_subs = self.subs.lock().await;
-            state_subs.insert(id,LocalSubscriberRef {
-                stream: stream_write,
-                address: subscriber.address,
-                topic: subscriber.topic.clone(),
-            });
+            // split stream read and write ends
+            let (mut stream_read,stream_write) = io::split(stream);
+
+            // create local subscriber reference
+            {
+                let mut state_subs = self.subs.lock().await;
+                state_subs.insert(id,LocalSubscriberRef {
+                    stream: stream_write,
+                    address: subscriber.address,
+                    topic: subscriber.topic.clone(),
+                });
+            }
+
+            // initialize local subscriber
+            {
+                let mut state_subs = self.subs.lock().await;
+                let p = state_subs.get_mut(&id).unwrap();
+                send_message(&mut p.stream,ParticipantToSubscriber::Init).await;
+            }
+
+            // inform relevant local publishers of new subscriber
+            {
+                let mut state_pubs = self.pubs.lock().await;
+                for (_,p) in state_pubs.iter_mut() {
+                    if p.topic == subscriber.topic {
+                        send_message(&mut p.stream,ParticipantToPublisher::NewSub(id,SubscriberRef {
+                            address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),subscriber.address.port()),
+                            topic: subscriber.topic.clone(),
+                        })).await;
+                    }
+                }
+            }
+
+            // inform all peers of new subscriber
+            {
+                let mut state_peers = self.peers.lock().await;
+                for (_,peer) in state_peers.iter_mut() {
+                    send_message(&mut peer.stream,ParticipantToParticipant::NewSub(id,subscriber.clone())).await;
+                }
+            }
+
+            // wait for connection to break
+            let mut buffer = vec![0u8; 65536];
+            while let Ok(length) = stream_read.read(&mut buffer).await {
+                if length == 0 {
+                    break;
+                }
+            }
+
+            // destroy local subscriber reference
+            {
+                let mut state_subs = self.subs.lock().await;
+                state_subs.remove(&id);
+            }
+
+            // inform all peers that subscriber is lost
+            {
+                let mut state_peers = self.peers.lock().await;
+                for (_,peer) in state_peers.iter_mut() {
+                    send_message(&mut peer.stream,ParticipantToParticipant::DropSub(id)).await;
+                }
+            }
+
+            // inform relevant local publishers that subscriber is lost
+            {
+                let mut state_pubs = self.pubs.lock().await;
+                for (_,p) in state_pubs.iter_mut() {
+                    if p.topic == subscriber.topic {
+                        send_message(&mut p.stream,ParticipantToPublisher::DropSub(id)).await;
+                    }
+                }
+            }
+
         }
-
-        // initialize local subscriber
-        {
+        else {
             let mut state_subs = self.subs.lock().await;
             let p = state_subs.get_mut(&id).unwrap();
-            send_message(&mut p.stream,ParticipantToSubscriber::Init).await;
-        }
-
-        // inform relevant local publishers of new subscriber
-        {
-            let mut state_pubs = self.pubs.lock().await;
-            for (_,p) in state_pubs.iter_mut() {
-                if p.topic == subscriber.topic {
-                    send_message(&mut p.stream,ParticipantToPublisher::NewSub(id,SubscriberRef {
-                        address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),subscriber.address.port()),
-                        topic: subscriber.topic.clone(),
-                    })).await;
-                }
-            }
-        }
-
-        // inform all peers of new subscriber
-        {
-            let mut state_peers = self.peers.lock().await;
-            for (_,peer) in state_peers.iter_mut() {
-                send_message(&mut peer.stream,ParticipantToParticipant::NewSub(id,subscriber.clone())).await;
-            }
-        }
-
-        // wait for connection to break
-        let mut buffer = vec![0u8; 65536];
-        while let Ok(length) = stream_read.read(&mut buffer).await {
-            if length == 0 {
-                break;
-            }
-        }
-
-        // destroy local subscriber reference
-        {
-            let mut state_subs = self.subs.lock().await;
-            state_subs.remove(&id);
-        }
-
-        // inform all peers that subscriber is lost
-        {
-            let mut state_peers = self.peers.lock().await;
-            for (_,peer) in state_peers.iter_mut() {
-                send_message(&mut peer.stream,ParticipantToParticipant::DropSub(id)).await;
-            }
-        }
-
-        // inform relevant local publishers that subscriber is lost
-        {
-            let mut state_pubs = self.pubs.lock().await;
-            for (_,p) in state_pubs.iter_mut() {
-                if p.topic == subscriber.topic {
-                    send_message(&mut p.stream,ParticipantToPublisher::DropSub(id)).await;
-                }
-            }
+            send_message(&mut p.stream,ParticipantToSubscriber::InitFailed(SubInitFailed::DomainMismatch)).await;
         }
     }
 

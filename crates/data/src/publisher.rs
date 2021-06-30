@@ -25,13 +25,14 @@ pub struct SubscriberControl {
 
 pub struct Publisher {
     pub id: PublisherId,
+    pub domain: String,
     pub topic: String,
     pub subs: Mutex<HashMap<SubscriberId,Arc<SubscriberControl>>>,
     pub tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
 impl Publisher {
-    pub async fn new(topic: &str) -> Arc<Publisher> {
+    pub async fn new(pubsub_port: u16,domain: &str,topic: &str) -> Arc<Publisher> {
 
         // new ID
         let id = rand::random::<u64>();
@@ -39,6 +40,7 @@ impl Publisher {
         // create publisher
         let publisher = Arc::new(Publisher {
             id: id,
+            domain: domain.to_string(),
             topic: topic.to_string(),
             subs: Mutex::new(HashMap::new()),  // subscribers as maintained by the participant
             tasks: Mutex::new(Vec::new()),
@@ -47,7 +49,7 @@ impl Publisher {
         // spawn participant receiver
         let this = Arc::clone(&publisher);
         task::spawn(async move {
-            this.run_participant_connection().await;
+            this.run_participant_connection(pubsub_port).await;
         });
 
         println!("publisher {:016X} of \"{}\" running",id,topic);
@@ -55,15 +57,15 @@ impl Publisher {
         publisher
     }
 
-    pub async fn run_participant_connection(self: &Arc<Publisher>) {
+    pub async fn run_participant_connection(self: &Arc<Publisher>,pubsub_port: u16) {
 
         loop {
 
             // connect to participant
-            if let Ok(mut stream) = net::TcpStream::connect("0.0.0.0:7332").await {
+            if let Ok(mut stream) = net::TcpStream::connect(format!("0.0.0.0:{}",pubsub_port)).await {
 
                 // announce publisher to participant
-                send_message(&mut stream,ToParticipant::InitPub(self.id,PublisherRef {
+                send_message(&mut stream,ToParticipant::InitPub(self.id,self.domain.clone(),PublisherRef {
                     topic: self.topic.clone(),
                 })).await;
 
@@ -85,8 +87,10 @@ impl Publisher {
                                     }));
                                 }
                             },
-                            ParticipantToPublisher::InitFailed => {
-                                panic!("publisher initialization failed!");
+                            ParticipantToPublisher::InitFailed(reason) => {
+                                match reason {
+                                    PubInitFailed::DomainMismatch => { println!("Publisher initialization failed: domain mismatch."); },
+                                }
                             },
                             ParticipantToPublisher::NewSub(id,subscriber) => {
                                 println!("subscriber {:016X} found at {}",id,subscriber.address);

@@ -35,6 +35,7 @@ pub struct Chunk {
 pub enum PublisherToSubscriber {
     Heartbeat(MessageId),
     Chunk(Chunk),
+    HeartbeatChunk(Chunk),
 }
 
 #[derive(Codec)]
@@ -45,6 +46,7 @@ pub enum SubscriberToPublisher {
 #[derive(Codec)]
 pub struct Beacon {
     pub id: ParticipantId,
+    pub domain: String,
     pub port: u16,
 }
 
@@ -76,22 +78,32 @@ pub enum ParticipantToParticipant {
 
 #[derive(Codec)]
 pub enum ToParticipant {
-    InitPub(PublisherId,PublisherRef),
-    InitSub(SubscriberId,SubscriberRef),
+    InitPub(PublisherId,String,PublisherRef),
+    InitSub(SubscriberId,String,SubscriberRef),
+}
+
+#[derive(Codec)]
+pub enum PubInitFailed {
+    DomainMismatch,
 }
 
 #[derive(Codec)]
 pub enum ParticipantToPublisher {
     Init(HashMap<SubscriberId,SubscriberRef>),
-    InitFailed,
+    InitFailed(PubInitFailed),
     NewSub(SubscriberId,SubscriberRef),
     DropSub(SubscriberId),
 }
 
 #[derive(Codec)]
+pub enum SubInitFailed {
+    DomainMismatch,
+}
+
+#[derive(Codec)]
 pub enum ParticipantToSubscriber {
     Init,
-    InitFailed,
+    InitFailed(SubInitFailed),
 }
 
 pub async fn send_message<S: io::AsyncWrite + Unpin,M: Codec>(stream: &mut S,message: M) {

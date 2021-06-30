@@ -17,7 +17,7 @@ async fn async_main() {
     file.read_to_end(&mut buffer).await.expect("cannot read file");
 
     // create hello publisher
-    let publisher = Publisher::new("/hello").await;
+    let publisher = Publisher::new(7332,"office_test","/hello").await;
 
     // publish message every 5 seconds
     loop {

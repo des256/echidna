@@ -25,6 +25,7 @@ pub struct SubscriberState {
 
 pub struct Subscriber {
     pub id: PublisherId,
+    pub domain: String,
     pub topic: String,
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
@@ -32,7 +33,7 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub async fn new(topic: &str,on_data: impl Fn(&[u8]) + Send + 'static) -> Arc<Subscriber> {
+    pub async fn new(pubsub_port: u16,domain: &str,topic: &str,on_data: impl Fn(&[u8]) + Send + 'static) -> Arc<Subscriber> {
 
         // new ID
         let id = rand::random::<u64>();
@@ -44,6 +45,7 @@ impl Subscriber {
         // create subscriber
         let subscriber = Arc::new(Subscriber {
             id: id,
+            domain: domain.to_string(),
             topic: topic.to_string(),
             socket: socket,
             address: address,
@@ -57,13 +59,13 @@ impl Subscriber {
         // spawn participant receiver
         let this = Arc::clone(&subscriber);
         task::spawn(async move {
-            this.run_participant_connection().await;
+            this.run_participant_connection(pubsub_port).await;
         });
 
         // spawn socket receiver
         let this = Arc::clone(&subscriber);
         task::spawn(async move {
-            this.run_socket_receiver(on_data).await;
+            this.run_socket_receiver(&on_data).await;
         });
 
         println!("subscriber {:016X} of \"{}\" running at port {}",id,topic,address.port());
@@ -71,15 +73,15 @@ impl Subscriber {
         subscriber
     }
 
-    pub async fn run_participant_connection(self: &Arc<Subscriber>) {
+    pub async fn run_participant_connection(self: &Arc<Subscriber>,pubsub_port: u16) {
 
         loop {
 
             // connect to participant
-            if let Ok(mut stream) = net::TcpStream::connect("0.0.0.0:7332").await {
+            if let Ok(mut stream) = net::TcpStream::connect(format!("0.0.0.0:{}",pubsub_port)).await {
 
                 // announce subscriber to participant
-                send_message(&mut stream,ToParticipant::InitSub(self.id,SubscriberRef {
+                send_message(&mut stream,ToParticipant::InitSub(self.id,self.domain.clone(),SubscriberRef {
                     address: self.address,
                     topic: self.topic.clone(),
                 })).await;
@@ -93,8 +95,10 @@ impl Subscriber {
                     if let Some((_,message)) = ParticipantToSubscriber::decode(&recv_buffer) {
                         match message {
                             ParticipantToSubscriber::Init => { },
-                            ParticipantToSubscriber::InitFailed => {
-                                panic!("publisher initialization failed!");
+                            ParticipantToSubscriber::InitFailed(reason) => {
+                                match reason {
+                                    SubInitFailed::DomainMismatch => { println!("Subscriber initialization failed: domain mismatch."); },
+                                }
                             },
                         }
                     }
@@ -113,7 +117,78 @@ impl Subscriber {
         }
     }
 
-    pub async fn run_socket_receiver(self: &Arc<Subscriber>,on_data: impl Fn(&[u8]) + Send + 'static) {
+    async fn process_heartbeat(self: &Arc<Subscriber>,id: MessageId,address: SocketAddr,ack_indices: Vec<u32>) -> Vec<u32> {
+
+        let state = self.state.lock().await;
+
+        // only respond if this is for the current message
+        if id == state.id {
+
+            println!("received heartbeat");
+
+            // send acknowledgements back
+            println!("sending acknowledgements:");
+            for index in ack_indices.iter() {
+                println!("    {}",index);
+            }
+            let mut send_buffer = Vec::<u8>::new();
+            SubscriberToPublisher::Ack(id,ack_indices).encode(&mut send_buffer);
+            self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
+
+            Vec::new()
+        }
+        else {
+            ack_indices
+        }
+    }
+
+    async fn process_chunk(self: &Arc<Subscriber>,chunk: Chunk,mut ack_indices: Vec<u32>,on_data: &(impl Fn(&[u8]) + Send + 'static)) -> Vec<u32> {
+
+        let mut state = self.state.lock().await;
+
+        // if this is a new chunk, reset state
+        if chunk.id != state.id {
+            state.id = chunk.id;
+            state.buffer = vec![0; chunk.total_bytes as usize];
+            state.received = vec![false; chunk.total as usize];
+            ack_indices.clear();
+        }
+
+        println!("received chunk {}",chunk.index);
+
+        ack_indices.push(chunk.index);
+
+        // if we don't already have this chunk
+        if !state.received[chunk.index as usize] {
+
+            // copy data into final message buffer
+            let start = chunk.index as usize * CHUNK_SIZE;
+            let end = start + chunk.data.len();
+            state.buffer[start..end].copy_from_slice(&chunk.data);
+
+            // mark the chunk as received
+            state.received[chunk.index as usize] = true;
+
+            // verify if all chunks are received
+            let mut complete = true;
+            for received in state.received.iter() {
+                if !received {
+                    complete = false;
+                    break;
+                }
+            }
+
+            // if all chunks received, pass to callback
+            if complete {
+                println!("all chunks received");
+                on_data(&state.buffer);
+            }
+        }
+
+        ack_indices
+    }
+
+    pub async fn run_socket_receiver(self: &Arc<Subscriber>,on_data: &(impl Fn(&[u8]) + Send + 'static)) {
 
         let mut buffer = vec![0u8; 65536];
 
@@ -128,72 +203,22 @@ impl Subscriber {
 
                 match pts {
 
-                    // Heartbeat, respond with Ack
+                    // heartbeat, respond with Ack
                     PublisherToSubscriber::Heartbeat(id) => {
-
-                        let state = self.state.lock().await;
-
-                        // only respond if this is for the current message
-                        if id == state.id {
-
-                            println!("received heartbeat");
-
-                            // send acknowledgements back
-                            println!("sending acknowledgements:");
-                            for index in ack_indices.iter() {
-                                println!("    {}",index);
-                            }
-                            let mut send_buffer = Vec::<u8>::new();
-                            SubscriberToPublisher::Ack(id,ack_indices).encode(&mut send_buffer);
-                            self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
-                            ack_indices = Vec::new();
-                        }
+                        ack_indices = self.process_heartbeat(id,address,ack_indices).await;
                     },
 
                     // chunk
                     PublisherToSubscriber::Chunk(chunk) => {
-
-                        let mut state = self.state.lock().await;
-
-                        // if this is a new chunk, reset state
-                        if chunk.id != state.id {
-                            state.id = chunk.id;
-                            state.buffer = vec![0; chunk.total_bytes as usize];
-                            state.received = vec![false; chunk.total as usize];
-                            ack_indices.clear();
-                        }
-
-                        println!("received chunk {}",chunk.index);
-
-                        ack_indices.push(chunk.index);
-
-                        // if we don't already have this chunk
-                        if !state.received[chunk.index as usize] {
-
-                            // copy data into final message buffer
-                            let start = chunk.index as usize * CHUNK_SIZE;
-                            let end = start + chunk.data.len();
-                            state.buffer[start..end].copy_from_slice(&chunk.data);
-
-                            // mark the chunk as received
-                            state.received[chunk.index as usize] = true;
-
-                            // verify if all chunks are received
-                            let mut complete = true;
-                            for received in state.received.iter() {
-                                if !received {
-                                    complete = false;
-                                    break;
-                                }
-                            }
-
-                            // if all chunks received, pass to callback
-                            if complete {
-                                println!("all chunks received");
-                                on_data(&state.buffer);
-                            }
-                        }
+                        ack_indices = self.process_chunk(chunk,ack_indices,on_data).await;
                     },
+
+                    // chunk and heartbeat
+                    PublisherToSubscriber::HeartbeatChunk(chunk) => {
+                        let id = chunk.id;
+                        ack_indices = self.process_chunk(chunk,ack_indices,on_data).await;
+                        ack_indices = self.process_heartbeat(id,address,ack_indices).await;
+                    }
                 }
             }
             else {
