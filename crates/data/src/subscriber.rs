@@ -126,7 +126,7 @@ impl Subscriber {
         let mut first_missing = 0u32;
         let mut last_missing: Option<u32> = None;
 
-        let mut chunks_received = 0usize;
+        let mut chunks_total = 0usize;
         let mut chunks_ignored = 0usize;
 
         loop {
@@ -181,12 +181,16 @@ impl Subscriber {
                             state.id = chunk.id;
                             state.buffer = vec![0; chunk.total_bytes as usize];
                             state.received = vec![false; chunk.total as usize];
+
+                            chunks_total = 0;
+                            chunks_ignored = 0;
                         }
+
+                        chunks_total += 1;
                 
                         // if we don't already have this chunk
                         if !state.received[chunk.index as usize] {
 
-                            chunks_received += 1;
                             //println!("receive {}",chunk.index);
 
                             // copy data into final message buffer
@@ -221,8 +225,9 @@ impl Subscriber {
                                 let end_time = time::Instant::now();
                                 let size_mb = (chunk.total_bytes as f32) / 1000000.0;
                                 let dur_sec = ((end_time - start_time).as_nanos() as f32) / 1000000000.0;
-                                let rate = size_mb / dur_sec;
-                                println!("done, throughput:{:6.3} MBps, ignored/received: {:6.3}",rate,(chunks_ignored as f32) / (chunks_received as f32));
+                                let throughput = size_mb / dur_sec;
+                                let wasted = (chunks_ignored * 100) / chunks_total;
+                                println!("done, throughput: {:6.3} MBps, waste: {:6.3} %",throughput,waste);
 
                                 on_data(&state.buffer);
                             }
