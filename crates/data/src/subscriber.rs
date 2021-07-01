@@ -126,6 +126,9 @@ impl Subscriber {
         let mut first_missing = 0u32;
         let mut last_missing: Option<u32> = None;
 
+        let mut chunks_received = 0usize;
+        let mut chunks_ignored = 0usize;
+
         loop {
 
             // receive heartbeat or chunk
@@ -183,6 +186,7 @@ impl Subscriber {
                         // if we don't already have this chunk
                         if !state.received[chunk.index as usize] {
 
+                            chunks_received += 1;
                             //println!("receive {}",chunk.index);
 
                             // copy data into final message buffer
@@ -218,12 +222,13 @@ impl Subscriber {
                                 let size_mb = (chunk.total_bytes as f32) / 1000000.0;
                                 let dur_sec = ((end_time - start_time).as_nanos() as f32) / 1000000000.0;
                                 let rate = size_mb / dur_sec;
-                                println!("done, {} MBps",rate);
+                                println!("done, throughput:{:6.3} MBps, ignored/received: {:6.3}",rate,(chunks_ignored as f32) / (chunks_received as f32));
 
                                 on_data(&state.buffer);
                             }
                         }
                         else {
+                            chunks_ignored += 1;
                             //println!("ignore {}",chunk.index);
                         }
                     },
