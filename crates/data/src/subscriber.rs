@@ -65,7 +65,7 @@ impl Subscriber {
         // spawn socket receiver
         let this = Arc::clone(&subscriber);
         task::spawn(async move {
-            this.run_socket_receiver(&on_data).await;
+            this.run_socket_receiver(on_data).await;
         });
 
         println!("subscriber {:016X} of \"{}\" running at port {}",id,topic,address.port());
@@ -117,78 +117,9 @@ impl Subscriber {
         }
     }
 
-    async fn process_heartbeat(self: &Arc<Subscriber>,id: MessageId,address: SocketAddr,ack_indices: Vec<u32>) -> Vec<u32> {
+    pub async fn run_socket_receiver(self: &Arc<Subscriber>,on_data: impl Fn(&[u8]) + Send + 'static) {
 
-        let state = self.state.lock().await;
-
-        // only respond if this is for the current message
-        if id == state.id {
-
-            println!("received heartbeat");
-
-            // send acknowledgements back
-            println!("sending acknowledgements:");
-            for index in ack_indices.iter() {
-                println!("    {}",index);
-            }
-            let mut send_buffer = Vec::<u8>::new();
-            SubscriberToPublisher::Ack(id,ack_indices).encode(&mut send_buffer);
-            self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
-
-            Vec::new()
-        }
-        else {
-            ack_indices
-        }
-    }
-
-    async fn process_chunk(self: &Arc<Subscriber>,chunk: Chunk,mut ack_indices: Vec<u32>,on_data: &(impl Fn(&[u8]) + Send + 'static)) -> Vec<u32> {
-
-        let mut state = self.state.lock().await;
-
-        // if this is a new chunk, reset state
-        if chunk.id != state.id {
-            state.id = chunk.id;
-            state.buffer = vec![0; chunk.total_bytes as usize];
-            state.received = vec![false; chunk.total as usize];
-            ack_indices.clear();
-        }
-
-        println!("received chunk {}",chunk.index);
-
-        ack_indices.push(chunk.index);
-
-        // if we don't already have this chunk
-        if !state.received[chunk.index as usize] {
-
-            // copy data into final message buffer
-            let start = chunk.index as usize * CHUNK_SIZE;
-            let end = start + chunk.data.len();
-            state.buffer[start..end].copy_from_slice(&chunk.data);
-
-            // mark the chunk as received
-            state.received[chunk.index as usize] = true;
-
-            // verify if all chunks are received
-            let mut complete = true;
-            for received in state.received.iter() {
-                if !received {
-                    complete = false;
-                    break;
-                }
-            }
-
-            // if all chunks received, pass to callback
-            if complete {
-                println!("all chunks received");
-                on_data(&state.buffer);
-            }
-        }
-
-        ack_indices
-    }
-
-    pub async fn run_socket_receiver(self: &Arc<Subscriber>,on_data: &(impl Fn(&[u8]) + Send + 'static)) {
+        let mut start_time = time::Instant::now();
 
         let mut buffer = vec![0u8; 65536];
 
@@ -205,24 +136,78 @@ impl Subscriber {
 
                     // heartbeat, respond with Ack
                     PublisherToSubscriber::Heartbeat(id) => {
-                        ack_indices = self.process_heartbeat(id,address,ack_indices).await;
+
+                        let state = self.state.lock().await;
+
+                        // only respond if this is for the current message
+                        if id == state.id {
+                
+                            //println!("{:?}: receive heartbeat",time::Instant::now());
+                
+                            // send acknowledgements back
+                            let mut send_buffer = Vec::<u8>::new();
+                            SubscriberToPublisher::Ack(id,ack_indices).encode(&mut send_buffer);
+                            //println!("{:?}: send acknowledgements",time::Instant::now());
+                            self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
+                            ack_indices = Vec::new();
+                        }
                     },
 
                     // chunk
                     PublisherToSubscriber::Chunk(chunk) => {
-                        ack_indices = self.process_chunk(chunk,ack_indices,on_data).await;
-                    },
 
-                    // chunk and heartbeat
-                    PublisherToSubscriber::HeartbeatChunk(chunk) => {
-                        let id = chunk.id;
-                        ack_indices = self.process_chunk(chunk,ack_indices,on_data).await;
-                        ack_indices = self.process_heartbeat(id,address,ack_indices).await;
-                    }
+                        //println!("{:?}: receive chunk {}",time::Instant::now(),chunk.index);
+
+                        let mut state = self.state.lock().await;
+
+                        // if this is a new chunk, reset state
+                        if chunk.id != state.id {
+
+                            start_time = time::Instant::now();
+
+                            state.id = chunk.id;
+                            state.buffer = vec![0; chunk.total_bytes as usize];
+                            state.received = vec![false; chunk.total as usize];
+                            ack_indices.clear();
+                        }
+                
+                        ack_indices.push(chunk.index);
+                
+                        // if we don't already have this chunk
+                        if !state.received[chunk.index as usize] {
+                
+                            // copy data into final message buffer
+                            let start = chunk.index as usize * CHUNK_SIZE;
+                            let end = start + chunk.data.len();
+                            state.buffer[start..end].copy_from_slice(&chunk.data);
+                
+                            // mark the chunk as received
+                            state.received[chunk.index as usize] = true;
+                
+                            // verify if all chunks are received
+                            let mut complete = true;
+                            for received in state.received.iter() {
+                                if !received {
+                                    complete = false;
+                                    break;
+                                }
+                            }
+                
+                            // if all chunks received, pass to callback
+                            if complete {
+
+                                let end_time = time::Instant::now();
+
+                                println!("received in {:?}ns",(end_time - start_time).as_nanos());
+
+                                on_data(&state.buffer);
+                            }
+                        }
+                    },
                 }
             }
             else {
-                println!("message error");
+                //println!("message error");
             }
         }
     }

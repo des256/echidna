@@ -35,7 +35,6 @@ pub struct Chunk {
 pub enum PublisherToSubscriber {
     Heartbeat(MessageId),
     Chunk(Chunk),
-    HeartbeatChunk(Chunk),
 }
 
 #[derive(Codec)]

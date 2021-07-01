@@ -197,6 +197,9 @@ impl Publisher {
             let chunks = Arc::clone(&master_chunks);
             let subscriber = Arc::clone(&subscriber);
             tasks.push(task::spawn(async move {
+
+                let start_time = time::Instant::now();
+
                 let mut last = 0usize;
                 let mut indices = Vec::<usize>::new();
                 while last < total {
@@ -208,14 +211,13 @@ impl Publisher {
                     }
 
                     // send chunks
-                    println!("sending chunks:");
                     for index in indices.iter() {
-                        println!("    {}",index);
+                        //println!("{:?}: send {}",time::Instant::now(),index);
                         subscriber.socket.send_to(&chunks[*index],subscriber.address).await.expect("error sending chunk");
                     }
 
                     // send heartbeat
-                    println!("sending heartbeat");
+                    //println!("{:?}: send heartbeat",time::Instant::now());
                     let mut send_buffer = Vec::<u8>::new();
                     PublisherToSubscriber::Heartbeat(id).encode(&mut send_buffer);
                     subscriber.socket.send_to(&send_buffer,subscriber.address).await.expect("error sending heartbeat");
@@ -228,9 +230,9 @@ impl Publisher {
                             match stp {
                                 SubscriberToPublisher::Ack(message_id,acks) => {
                                     if message_id == id {
-                                        println!("received acknowledgement:");
+                                        //println!("{:?}: received acknowledgements for:",time::Instant::now());
                                         for ack in acks {
-                                            println!("    {}",ack);
+                                            //println!("    {}",ack);
                                             for i in 0..indices.len() {
                                                 if indices[i] == ack as usize {
                                                     indices.remove(i);
@@ -244,12 +246,18 @@ impl Publisher {
                         }
                     }
                     else {
-                        println!("retransmit timeout");
+                        //println!("retransmit timeout");
                     }
 
                     // TODO: measure RTT and recalculate RTO
                 }
-                println!("done transmitting.");
+
+                let end_time = time::Instant::now();
+                let duration = end_time - start_time;
+
+                let mbps = ((total_bytes * 1000) as u128) / duration.as_nanos();
+
+                println!("transmitted in {:?}ns ({} MB/s)",duration.as_nanos(),mbps);
             }));
         }
 

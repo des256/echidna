@@ -58,7 +58,7 @@ If possible/sensible see if managing multicast networks works.
 - DOING: Linux
 - Windows
 - MacOS
-- Android
+- DOING: Android
 - DOING: iOS
 
 ### More Features
