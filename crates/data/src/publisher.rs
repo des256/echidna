@@ -257,7 +257,7 @@ impl Publisher {
 
                 let mbps = ((total_bytes * 1000) as u128) / duration.as_nanos();
 
-                println!("transmitted in {:?}ns ({} MB/s)",duration.as_nanos(),mbps);
+                println!("transmitted in {:?}ns ({} MB/s) to {}",duration.as_nanos(),mbps,subscriber.address);
             }));
         }
 

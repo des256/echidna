@@ -45,6 +45,14 @@ There are many parameters to play with and many delay strategies. This might tak
 
 Works very well on local loopback, with small N (< 7). Larger means the heartbeat gets lost (it appears subscriber-side IP rcvbuf is too small). Assume that very small N (2?) will work for now.
 
+#### Some Measurements
+
+local loopback on i9/64GB: around 120 MB/s
+local gigabit network: around 44 MB/s
+local loopback and gigabit: 120 MB/s on loopback, 35 MB/s on network
+
+
+
 ### Shared Memory
 
 - When subscriber is local, use shared memory to transport the message.
