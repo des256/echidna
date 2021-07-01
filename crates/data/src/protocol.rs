@@ -14,7 +14,7 @@ use {
 
 pub const CHUNK_SIZE: usize = 50 * 1024;
 pub const CHUNKS_PER_HEARTBEAT: usize = 16;
-pub const TRANSMIT_INTERVAL_USEC: u64 = 200;
+pub const TRANSMIT_INTERVAL_USEC: u64 = 100;
 pub const WAITS_BEFORE_HEARTBEAT: usize = 4;
 //pub const RETRANSMIT_TIMEOUT_USEC: u64 = 10000;
 

@@ -145,20 +145,20 @@ impl Subscriber {
                         // only respond if this is for the current message
                         if id == state.id {
                
-                            println!("receive heartbeat");
+                            //println!("receive heartbeat");
 
                             if let Some(last) = last_missing {
                                 if last > first_missing {
-                                    println!("send nack {}-{}",first_missing,last);
+                                    //println!("send nack {}-{}",first_missing,last);
                                     SubscriberToPublisher::NAck(id,first_missing,last).encode(&mut send_buffer);
                                 }
                                 else {
-                                    println!("send ack {}",first_missing);
+                                    //println!("send ack {}",first_missing);
                                     SubscriberToPublisher::Ack(id,first_missing).encode(&mut send_buffer);
                                 }
                             }
                             else {
-                                println!("send ack {}",first_missing);
+                                //println!("send ack {}",first_missing);
                                 SubscriberToPublisher::Ack(id,first_missing).encode(&mut send_buffer);
                             }
                             self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
@@ -183,7 +183,7 @@ impl Subscriber {
                         // if we don't already have this chunk
                         if !state.received[chunk.index as usize] {
 
-                            println!("receive {}",chunk.index);
+                            //println!("receive {}",chunk.index);
 
                             // copy data into final message buffer
                             let start = chunk.index as usize * CHUNK_SIZE;
@@ -224,7 +224,7 @@ impl Subscriber {
                             }
                         }
                         else {
-                            println!("ignore {}",chunk.index);
+                            //println!("ignore {}",chunk.index);
                         }
                     },
                 }
