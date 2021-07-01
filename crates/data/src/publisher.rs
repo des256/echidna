@@ -13,7 +13,10 @@ use {
     std::{
         sync::Arc,
         net::SocketAddr,
-        collections::HashMap,
+        collections::{
+            HashMap,
+            HashSet,
+        },
         time::Duration,
     },
 };
@@ -28,7 +31,8 @@ pub struct Publisher {
     pub domain: String,
     pub topic: String,
     pub subs: Mutex<HashMap<SubscriberId,Arc<SubscriberControl>>>,
-    pub tasks: Mutex<Vec<task::JoinHandle<()>>>,
+    pub send_tasks: Mutex<Vec<task::JoinHandle<()>>>,
+    pub recv_tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
 impl Publisher {
@@ -43,7 +47,8 @@ impl Publisher {
             domain: domain.to_string(),
             topic: topic.to_string(),
             subs: Mutex::new(HashMap::new()),  // subscribers as maintained by the participant
-            tasks: Mutex::new(Vec::new()),
+            send_tasks: Mutex::new(Vec::new()),
+            recv_tasks: Mutex::new(Vec::new()),
         });
 
         // spawn participant receiver
@@ -133,7 +138,12 @@ impl Publisher {
 
         // cancel current tasks
         {
-            let mut tasks = self.tasks.lock().await;
+            let mut tasks = self.send_tasks.lock().await;
+            for task in tasks.iter() {
+                task.abort();
+            }
+            *tasks = Vec::new();
+            let mut tasks = self.recv_tasks.lock().await;
             for task in tasks.iter() {
                 task.abort();
             }
@@ -191,77 +201,169 @@ impl Publisher {
         // take snapshot of current subscriber set
         let subs = self.subs.lock().await.clone();
 
-        // spawn task for each subscriber
-        let mut tasks = Vec::<task::JoinHandle<()>>::new();
-        for (_,subscriber) in subs.iter() {
-            let chunks = Arc::clone(&master_chunks);
-            let subscriber = Arc::clone(&subscriber);
-            tasks.push(task::spawn(async move {
+        // spawn send and recv tasks for each subscriber
+        let mut send_tasks = Vec::<task::JoinHandle<()>>::new();
+        let mut recv_tasks = Vec::<task::JoinHandle<()>>::new();
+        for (_,master_subscriber) in subs.iter() {
 
-                let start_time = time::Instant::now();
+            let master_dones = Arc::new(Mutex::new(vec![false; master_chunks.len()]));
+            let master_retransmits = Arc::new(Mutex::new(HashSet::<u32>::new()));
 
-                let mut last = 0usize;
-                let mut indices = Vec::<usize>::new();
-                while last < total {
+            {
+                let subscriber = Arc::clone(&master_subscriber);
+                let dones = Arc::clone(&master_dones);
+                let retransmits = Arc::clone(&master_retransmits);
+                recv_tasks.push(task::spawn(async move {
 
-                    // top up transmit list
-                    while (indices.len() < CHUNKS_PER_HEARTBEAT) && (last < total) {
-                        indices.push(last);
-                        last += 1;
-                    }
-
-                    // send chunks
-                    for index in indices.iter() {
-                        //println!("{:?}: send {}",time::Instant::now(),index);
-                        subscriber.socket.send_to(&chunks[*index],subscriber.address).await.expect("error sending chunk");
-                    }
-
-                    // send heartbeat
-                    //println!("{:?}: send heartbeat",time::Instant::now());
-                    let mut send_buffer = Vec::<u8>::new();
-                    PublisherToSubscriber::Heartbeat(id).encode(&mut send_buffer);
-                    subscriber.socket.send_to(&send_buffer,subscriber.address).await.expect("error sending heartbeat");
-
-                    // wait for acknowledgement or RTO timeout
                     let mut buffer = vec![0u8; 65536];
-                    let rto = Duration::from_micros(RETRANSMIT_TIMEOUT_USEC);
-                    if let Ok(_) = time::timeout(rto,subscriber.socket.recv_from(&mut buffer)).await {
+
+                    loop {
+
+                        // receive acks
+                        let _ = subscriber.socket.recv_from(&mut buffer).await.expect("error receiving");
                         if let Some((_,stp)) = SubscriberToPublisher::decode(&buffer) {
                             match stp {
-                                SubscriberToPublisher::Ack(message_id,acks) => {
+
+                                SubscriberToPublisher::Ack(message_id,index) => {
+
+                                    // subscriber has everything until index
+
                                     if message_id == id {
-                                        //println!("{:?}: received acknowledgements for:",time::Instant::now());
-                                        for ack in acks {
-                                            //println!("    {}",ack);
-                                            for i in 0..indices.len() {
-                                                if indices[i] == ack as usize {
-                                                    indices.remove(i);
-                                                    break;
-                                                }
-                                            }
+                                        println!("received ack {}",index);
+
+                                        // mark received chunks
+                                        let mut dones = dones.lock().await;
+                                        for i in 0..index {
+                                            dones[i as usize] = true;
+                                        }
+                                    }
+
+                                },
+
+                                SubscriberToPublisher::NAck(message_id,first,last) => {
+
+                                    // subscriber is missing first..last
+
+                                    if message_id == id {
+                                        println!("received nack {}-{}",first,last);
+
+                                        // mark received chunks
+                                        let mut dones = dones.lock().await;
+                                        for i in 0..first {
+                                            dones[i as usize] = true;
+                                        }
+
+                                        // and notice the retransmits
+                                        let mut retransmits = retransmits.lock().await;
+                                        for index in first..last {
+                                            retransmits.insert(index);
                                         }
                                     }
                                 },
                             }
                         }
                     }
-                    else {
-                        //println!("retransmit timeout");
+                }));
+            }
+            {
+                let chunks = Arc::clone(&master_chunks);
+                let subscriber = Arc::clone(&master_subscriber);
+                let dones = Arc::clone(&master_dones);
+                let retransmits = Arc::clone(&master_retransmits);
+                send_tasks.push(task::spawn(async move {
+
+                    let mut last = 0usize;
+
+                    let mut interval = time::interval(Duration::from_micros(TRANSMIT_INTERVAL_USEC));
+
+                    let mut done = false;
+                    while !done {
+
+                        let mut indices = Vec::<u32>::new();
+
+                        // first the retransmits
+                        {
+                            let mut retransmits = retransmits.lock().await;
+                            for index in retransmits.iter() {
+                                println!("send retransmit {}",index);
+                                indices.push(*index);
+                                if indices.len() >= CHUNKS_PER_HEARTBEAT {
+                                    break;
+                                }
+                            }
+                            for index in indices.iter() {
+                                retransmits.remove(index);
+                            }
+                        }
+
+                        // fill up what's left with remaining chunks
+                        while (indices.len() < CHUNKS_PER_HEARTBEAT) && (last < total) {
+                            println!("send regular {}",last);
+                            indices.push(last as u32);
+                            last += 1;
+                        }
+
+                        // if no items in the buffer yet, fill up with chunks left undone
+                        if indices.len() == 0 {
+                            let dones = dones.lock().await;
+                            for i in 0..dones.len() {
+                                if !dones[i] {
+                                    println!("send leftover {}",i);
+                                    indices.push(i as u32);
+                                    if indices.len() >= CHUNKS_PER_HEARTBEAT {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // send chunks
+                        for index in indices.iter() {
+                            subscriber.socket.send_to(&chunks[*index as usize],subscriber.address).await.expect("error sending chunk");
+                            interval.tick().await;
+                        }
+
+                        // wait before sending heartbeat
+                        for _ in 0..WAITS_BEFORE_HEARTBEAT {
+                            interval.tick().await;
+                        }
+
+                        // send heartbeat
+                        println!("send heartbeat");
+                        let mut send_buffer = Vec::<u8>::new();
+                        PublisherToSubscriber::Heartbeat(id).encode(&mut send_buffer);
+                        subscriber.socket.send_to(&send_buffer,subscriber.address).await.expect("error sending heartbeat");
+                        interval.tick().await;
+
+                        // verify we sent everything
+                        {
+                            done = true;
+                            let dones = dones.lock().await;
+                            for i in 0..dones.len() {
+                                if !dones[i] {
+                                    done = false;
+                                    break;
+                                }
+                            }
+                        }
                     }
 
-                    // TODO: measure RTT and recalculate RTO
-                }
+                    println!("done.");
 
-                let end_time = time::Instant::now();
-                let duration = end_time - start_time;
+                    /*
+                    let end_time = time::Instant::now();
+                    let duration = end_time - start_time;
 
-                let mbps = ((total_bytes * 1000) as u128) / duration.as_nanos();
+                    let mbps = ((total_bytes * 1000) as u128) / duration.as_nanos();
 
-                println!("transmitted in {:?}ns ({} MB/s) to {}",duration.as_nanos(),mbps,subscriber.address);
-            }));
+                    println!("transmitted in {:?}ns ({} MB/s) to {}",duration.as_nanos(),mbps,subscriber.address);
+                    */
+                }));
+            }
         }
 
         // keep the tasks
-        *self.tasks.lock().await = tasks;
+        *self.send_tasks.lock().await = send_tasks;
+        *self.recv_tasks.lock().await = recv_tasks;
     }
 }

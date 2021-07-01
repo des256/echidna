@@ -123,7 +123,8 @@ impl Subscriber {
 
         let mut buffer = vec![0u8; 65536];
 
-        let mut ack_indices = Vec::<u32>::new();
+        let mut first_missing = 0u32;
+        let mut last_missing: Option<u32> = None;
 
         loop {
 
@@ -139,24 +140,33 @@ impl Subscriber {
 
                         let state = self.state.lock().await;
 
+                        let mut send_buffer = Vec::<u8>::new();
+
                         // only respond if this is for the current message
                         if id == state.id {
-                
-                            //println!("{:?}: receive heartbeat",time::Instant::now());
-                
-                            // send acknowledgements back
-                            let mut send_buffer = Vec::<u8>::new();
-                            SubscriberToPublisher::Ack(id,ack_indices).encode(&mut send_buffer);
-                            //println!("{:?}: send acknowledgements",time::Instant::now());
+               
+                            println!("receive heartbeat");
+
+                            if let Some(last) = last_missing {
+                                if last > first_missing {
+                                    println!("send nack {}-{}",first_missing,last);
+                                    SubscriberToPublisher::NAck(id,first_missing,last).encode(&mut send_buffer);
+                                }
+                                else {
+                                    println!("send ack {}",first_missing);
+                                    SubscriberToPublisher::Ack(id,first_missing).encode(&mut send_buffer);
+                                }
+                            }
+                            else {
+                                println!("send ack {}",first_missing);
+                                SubscriberToPublisher::Ack(id,first_missing).encode(&mut send_buffer);
+                            }
                             self.socket.send_to(&mut send_buffer,address).await.expect("error sending retransmit request");
-                            ack_indices = Vec::new();
                         }
                     },
 
                     // chunk
                     PublisherToSubscriber::Chunk(chunk) => {
-
-                        //println!("{:?}: receive chunk {}",time::Instant::now(),chunk.index);
 
                         let mut state = self.state.lock().await;
 
@@ -168,14 +178,13 @@ impl Subscriber {
                             state.id = chunk.id;
                             state.buffer = vec![0; chunk.total_bytes as usize];
                             state.received = vec![false; chunk.total as usize];
-                            ack_indices.clear();
                         }
-                
-                        ack_indices.push(chunk.index);
                 
                         // if we don't already have this chunk
                         if !state.received[chunk.index as usize] {
-                
+
+                            println!("receive {}",chunk.index);
+
                             // copy data into final message buffer
                             let start = chunk.index as usize * CHUNK_SIZE;
                             let end = start + chunk.data.len();
@@ -183,25 +192,39 @@ impl Subscriber {
                 
                             // mark the chunk as received
                             state.received[chunk.index as usize] = true;
-                
-                            // verify if all chunks are received
-                            let mut complete = true;
-                            for received in state.received.iter() {
-                                if !received {
-                                    complete = false;
+
+                            // find first missing chunk
+                            first_missing = chunk.total;
+                            for i in 0..state.received.len() {
+                                if !state.received[i] {
+                                    first_missing = i as u32;
                                     break;
                                 }
                             }
-                
-                            // if all chunks received, pass to callback
-                            if complete {
 
+                            if first_missing < chunk.total {
+
+                                // find last missing chunk of this range
+                                last_missing = None;
+                                for i in first_missing..state.received.len() as u32 {
+                                    if state.received[i as usize] {
+                                        last_missing = Some(i);
+                                        break;
+                                    }
+                                }
+                            }
+                            else {
                                 let end_time = time::Instant::now();
-
-                                println!("received in {:?}ns",(end_time - start_time).as_nanos());
+                                let size_mb = (chunk.total_bytes as f32) / 1000000.0;
+                                let dur_sec = ((end_time - start_time).as_nanos() as f32) / 1000000000.0;
+                                let rate = size_mb / dur_sec;
+                                println!("done, {} MBps",rate);
 
                                 on_data(&state.buffer);
                             }
+                        }
+                        else {
+                            println!("ignore {}",chunk.index);
                         }
                     },
                 }

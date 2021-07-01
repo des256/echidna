@@ -12,7 +12,7 @@ use {
 };
 
 fn on_message(buffer: &[u8]) {
-    let mut file = fs::File::create("result.bmp").expect("cannot create file");
+    let mut file = fs::File::create("result.jpg").expect("cannot create file");
     file.write_all(&buffer).expect("cannot write to file");
 }
 

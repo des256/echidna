@@ -12,7 +12,7 @@ use {
 async fn async_main() {
 
     // prepare message
-    let mut file = fs::File::open("test.bmp").await.expect("cannot open file");
+    let mut file = fs::File::open("test.jpg").await.expect("cannot open file");
     let mut buffer = Vec::<u8>::new();
     file.read_to_end(&mut buffer).await.expect("cannot read file");
 
