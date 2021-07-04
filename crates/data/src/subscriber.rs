@@ -242,11 +242,20 @@ impl Subscriber {
                                     measure_waste += 1;
                                 }
                         
-                                println!("througput {:3} Mbps, nonzero waste {:2}%, avg. waste {:2}%",
-                                    (measure_mbps_nowaste * 100) / measure_nowaste,
-                                    (measure_waste * 100) / measure_total,
+                                let throughput = if measure_nowaste > 0 {
+                                    (measure_mbps_nowaste * 100) / measure_nowaste
+                                }
+                                else {
+                                    0
+                                };
+                                let nonzero_waste = (measure_waste * 100) / measure_total;
+                                let avg_waste = if measure_waste > 0 {
                                     (measure_perc_waste * 100) / measure_waste
-                                );
+                                }
+                                else {
+                                    0
+                                };
+                                println!("throughput {:3} Mbps, nonzero waste {:2}%, avg. waste {:2}%",throughput,nonzero_waste,avg_waste);
 
                                 on_data(&state.buffer);
                             }
