@@ -129,11 +129,9 @@ impl Subscriber {
         let mut chunks_total = 0usize;
         let mut chunks_ignored = 0usize;
 
-        let mut measure_mbps_nowaste = 0usize;  // total mbps at 0 waste
-        let mut measure_nowaste = 0usize;  // number of messages with 0 waste
-        let mut measure_total = 0usize;  // total number of messages
-        let mut measure_perc_waste = 0usize;  // total waste
-        let mut measure_waste = 0usize;  // number of messages with >0 waste
+        let mut measure_total = 0usize;
+        let mut measure_total_mbps = 0usize;
+        let mut measure_total_waste = 0usize;
 
         loop {
 
@@ -233,29 +231,12 @@ impl Subscriber {
                                 let waste = (chunks_ignored * 100) / chunks_total;
 
                                 measure_total += 1;
-                                measure_perc_waste += waste;
-                                if waste == 0 {
-                                    measure_nowaste += 1;
-                                    measure_mbps_nowaste += mbps as usize;
-                                }
-                                else {
-                                    measure_waste += 1;
-                                }
-                        
-                                let throughput = if measure_nowaste > 0 {
-                                    measure_mbps_nowaste / measure_nowaste
-                                }
-                                else {
-                                    0
-                                };
-                                let nonzero_waste = (measure_waste * 100) / measure_total;
-                                let avg_waste = if measure_waste > 0 {
-                                    measure_perc_waste / measure_waste
-                                }
-                                else {
-                                    0
-                                };
-                                println!("throughput {:3} Mbps, nonzero waste {:2}%, avg. waste {:2}%",throughput,nonzero_waste,avg_waste);
+                                measure_total_mbps += mbps as usize;
+                                measure_total_waste += waste;
+
+                                let avg_mbps = measure_total_mbps / measure_total;
+                                let avg_waste = measure_total_waste / measure_total;
+                                println!("throughput {:3} Mbps, waste {:2}%",avg_mbps,avg_waste);
 
                                 on_data(&state.buffer);
                             }

@@ -71,6 +71,12 @@ And, if a subscriber doesn't respond after a certain countdown, transmitting to 
 
 Assuming incoming data is queued, replacing the two task system with just one task per subscriber works.
 
+Further measurements...
+
+- IDEA: measure throughput by taking only entries with 0% waste; also measure average waste, and spread in waste
+
+
+
 ### Shared Memory
 
 When subscriber is local, use shared memory to transport the message.
