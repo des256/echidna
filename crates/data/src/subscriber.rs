@@ -243,14 +243,14 @@ impl Subscriber {
                                 }
                         
                                 let throughput = if measure_nowaste > 0 {
-                                    (measure_mbps_nowaste * 100) / measure_nowaste
+                                    measure_mbps_nowaste / measure_nowaste
                                 }
                                 else {
                                     0
                                 };
                                 let nonzero_waste = (measure_waste * 100) / measure_total;
                                 let avg_waste = if measure_waste > 0 {
-                                    (measure_perc_waste * 100) / measure_waste
+                                    measure_perc_waste / measure_waste
                                 }
                                 else {
                                     0
