@@ -10,12 +10,22 @@ use {
         collections::HashMap,
         net::SocketAddr,
     },
+    libc::{
+        c_int,
+    },
 };
 
 pub type MessageId = u64;
 pub type ParticipantId = u64;
 pub type PublisherId = u64;
 pub type SubscriberId = u64;
+
+pub type ShmDescr = c_int;
+
+pub struct SharedMemory {
+    pub descr: ShmDescr,
+    pub data: Vec<u8>,
+}
 
 #[derive(Codec)]
 pub struct Chunk {
@@ -36,7 +46,6 @@ pub enum PublisherToSubscriber {
 
 #[derive(Codec)]
 pub enum SubscriberToPublisher {
-    //Ack(MessageId,Vec<u32>),
     Ack(MessageId,u32),
     NAck(MessageId,u32,u32),
 }
@@ -87,10 +96,12 @@ pub enum PubInitFailed {
 
 #[derive(Codec)]
 pub enum ParticipantToPublisher {
-    Init(HashMap<SubscriberId,SubscriberRef>),
+    Init(HashMap<SubscriberId,SubscriberRef>,HashMap<SubscriberId,SubscriberRef>),
     InitFailed(PubInitFailed),
-    NewSub(SubscriberId,SubscriberRef),
-    DropSub(SubscriberId),
+    NewLocalSub(SubscriberId,SubscriberRef),
+    NewPeerSub(SubscriberId,SubscriberRef),
+    DropLocalSub(SubscriberId),
+    DropPeerSub(SubscriberId),
 }
 
 #[derive(Codec)]

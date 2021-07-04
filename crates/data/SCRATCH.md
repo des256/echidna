@@ -65,7 +65,7 @@ This works very well. Maximum TCP throughput is 112 MBytes/sec, and this strateg
 
 And finally we need to test with a lot more traffic, especially send messages faster than they can be processed. One strategy, instead of canceling the tasks when a new message appears is to cut the incoming message instead. That way, when the network is really congested, messages are still coming through. --> config setting
 
-Also, when a subscriber disappears, transmitting to that subscriber should stop. --> no copying of subscribers, use mutex
+Also, when a subscriber disappears, transmitting to that subscriber should stop. --> automatically handled by next point
 
 And, if a subscriber doesn't respond after a certain countdown, transmitting to that subscriber should stop. - so in general make sure the transmission always ends, either by success, or by canceling subscribers. --> timeout on read, close associated task
 
@@ -75,11 +75,15 @@ Further measurements...
 
 - IDEA: measure throughput by taking only entries with 0% waste; also measure average waste, and spread in waste
 
+The most stable configuration for now is large chunks (51200 bytes), 300usec transmit interval, no waiting for heartbeat.
 
+Still found a lot of waste, so there are many packets sent, but not needed. Maybe do some research there still.
 
 ### Shared Memory
 
 When subscriber is local, use shared memory to transport the message.
+
+- IDEA: participant manages shm_open object, publisher requests from participant at start, subscriber receives shm_open fd from participant at start, so it can immediately connect
 
 ### Multicast
 

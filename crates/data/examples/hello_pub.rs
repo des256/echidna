@@ -20,10 +20,10 @@ async fn async_main() {
     let publisher = Publisher::new_default(7332,"office_test","/hello").await;
 
     // publish message every 5 seconds
-    loop {
-        publisher.send(&buffer).await;
+    for _ in 0..100 {
+        publisher.set(&buffer).await;
         
-        time::sleep(Duration::from_secs(1)).await;
+        time::sleep(Duration::from_millis(500)).await;
     }
 }
 

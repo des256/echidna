@@ -15,6 +15,10 @@ use {
         net::SocketAddr,
         time::Duration,
     },
+    shared_memory::{
+        Shmem,
+        ShmemConf,
+    },
 };
 
 pub struct SubscriberState {
@@ -30,6 +34,7 @@ pub struct Subscriber {
     pub socket: net::UdpSocket,
     pub address: SocketAddr,
     pub state: Mutex<SubscriberState>,
+    pub shmem: Shmem,
 }
 
 impl Subscriber {
@@ -54,6 +59,7 @@ impl Subscriber {
                 buffer: Vec::new(),
                 received: Vec::new(),
             }),
+            shmem: ShmemConf::new().size(16384).os_id(topic).open().expect("cannot open shared memory"),
         });
 
         // spawn participant receiver

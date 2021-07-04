@@ -248,23 +248,24 @@ impl Participant {
             }
 
             // initialize local publisher
-            let mut subs = HashMap::<SubscriberId,SubscriberRef>::new();
+            let mut local_subs = HashMap::<SubscriberId,SubscriberRef>::new();
             {
                 let state_subs = self.subs.lock().await;
                 for (id,s) in state_subs.iter() {
                     if s.topic == publisher.topic {
-                        subs.insert(*id,SubscriberRef {
+                        local_subs.insert(*id,SubscriberRef {
                             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),s.address.port()),
                             topic: s.topic.clone(),
                         });
                     }
                 }
             }
+            let mut peer_subs = HashMap::<SubscriberId,SubscriberRef>::new();
             {
                 let state_peers = self.peers.lock().await;
                 for (_,peer) in state_peers.iter() {
                     for (id,s) in &peer.subs {
-                        subs.insert(*id,SubscriberRef {
+                        peer_subs.insert(*id,SubscriberRef {
                             address: SocketAddr::new(peer.ip,s.address.port()),
                             topic: s.topic.clone(),
                         });
@@ -274,7 +275,7 @@ impl Participant {
             {
                 let mut state_pubs = self.pubs.lock().await;
                 let p = state_pubs.get_mut(&id).unwrap();
-                send_message(&mut p.stream,ParticipantToPublisher::Init(subs)).await;
+                send_message(&mut p.stream,ParticipantToPublisher::Init(local_subs,peer_subs)).await;
             }
 
             // inform all peers of new publisher
@@ -293,7 +294,7 @@ impl Participant {
                 }
             }
 
-            // inform all peers that publisher is lost
+            // inform peers that publisher is lost
             {
                 let mut state_peers = self.peers.lock().await;
                 for (_,peer) in state_peers.iter_mut() {
@@ -347,7 +348,7 @@ impl Participant {
                 let mut state_pubs = self.pubs.lock().await;
                 for (_,p) in state_pubs.iter_mut() {
                     if p.topic == subscriber.topic {
-                        send_message(&mut p.stream,ParticipantToPublisher::NewSub(id,SubscriberRef {
+                        send_message(&mut p.stream,ParticipantToPublisher::NewLocalSub(id,SubscriberRef {
                             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),subscriber.address.port()),
                             topic: subscriber.topic.clone(),
                         })).await;
@@ -390,7 +391,7 @@ impl Participant {
                 let mut state_pubs = self.pubs.lock().await;
                 for (_,p) in state_pubs.iter_mut() {
                     if p.topic == subscriber.topic {
-                        send_message(&mut p.stream,ParticipantToPublisher::DropSub(id)).await;
+                        send_message(&mut p.stream,ParticipantToPublisher::DropLocalSub(id)).await;
                     }
                 }
             }
@@ -478,7 +479,7 @@ impl Participant {
                     for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                send_message(&mut p.stream,ParticipantToPublisher::NewSub(*sid,SubscriberRef {
+                                send_message(&mut p.stream,ParticipantToPublisher::NewPeerSub(*sid,SubscriberRef {
                                     address: SocketAddr::new(peer.ip,s.address.port()),
                                     topic: s.topic.clone(),
                                 })).await;
@@ -498,7 +499,7 @@ impl Participant {
                     for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                send_message(&mut p.stream,ParticipantToPublisher::DropSub(*sid)).await;
+                                send_message(&mut p.stream,ParticipantToPublisher::DropPeerSub(*sid)).await;
                             }
                         }
                     }
@@ -589,7 +590,7 @@ impl Participant {
                     for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                send_message(&mut p.stream,ParticipantToPublisher::NewSub(*sid,SubscriberRef {
+                                send_message(&mut p.stream,ParticipantToPublisher::NewPeerSub(*sid,SubscriberRef {
                                     address: SocketAddr::new(peer.ip,s.address.port()),
                                     topic: s.topic.clone(),
                                 })).await;
@@ -609,7 +610,7 @@ impl Participant {
                     for (_,p) in state_pubs.iter_mut() {
                         for (sid,s) in peer.subs.iter() {
                             if p.topic == s.topic {
-                                send_message(&mut p.stream,ParticipantToPublisher::DropSub(*sid)).await;
+                                send_message(&mut p.stream,ParticipantToPublisher::DropPeerSub(*sid)).await;
                             }
                         }
                     }
@@ -656,7 +657,7 @@ impl Participant {
                         let mut state_pubs = self.pubs.lock().await;
                         for (_,p) in state_pubs.iter_mut() {
                             if p.topic == subscriber.topic {
-                                send_message(&mut p.stream,ParticipantToPublisher::NewSub(id,SubscriberRef {
+                                send_message(&mut p.stream,ParticipantToPublisher::NewPeerSub(id,SubscriberRef {
                                     address: SocketAddr::new(peer.ip,subscriber.address.port()),
                                     topic: subscriber.topic.clone(),
                                 })).await;
@@ -673,7 +674,7 @@ impl Participant {
                         let mut state_pubs = self.pubs.lock().await;
                         for (_,p) in state_pubs.iter_mut() {
                             if p.topic == topic {
-                                send_message(&mut p.stream,ParticipantToPublisher::DropSub(id)).await;
+                                send_message(&mut p.stream,ParticipantToPublisher::DropPeerSub(id)).await;
                             }
                         }
                         peer.subs.remove(&id);

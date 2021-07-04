@@ -6,5 +6,7 @@ edition = "2018"
 
 [dependencies]
 rand = "*"
+libc = "*"
+shared_memory = "*"
 tokio = { version = "*", features = [ "full" ] }
 codec = { path = "../codec" }
