@@ -165,9 +165,10 @@ impl Publisher {
         while time::Instant::now() < end_instant {
 
             // receive acks and nacks
-            let result = time::timeout(time::Duration::from_micros(interval_usec),control.socket.recv_from(&mut buffer)).await.expect("error receiving");
-
-            if let Ok(_) = result {
+            if let Err(_) = time::timeout(time::Duration::from_micros(interval_usec),control.socket.recv_from(&mut buffer)).await {
+                *dead_counter += 1;
+            }
+            else {
 
                 if let Some((_,stp)) = SubscriberToPublisher::decode(&buffer) {
 
@@ -178,7 +179,7 @@ impl Publisher {
                             // subscriber has everything until index
 
                             if message_id == id {
-                                //println!("received ack {}",index);
+                                println!("received ack {}",index);
 
                                 // mark received chunks
                                 for i in 0..index {
@@ -193,7 +194,7 @@ impl Publisher {
                             // subscriber is missing first..last
 
                             if message_id == id {
-                                //println!("received nack {}-{}",first,last);
+                                println!("received nack {}-{}",first,last);
 
                                 // mark received chunks
                                 for i in 0..first {
@@ -208,9 +209,6 @@ impl Publisher {
                         },
                     }
                 }
-            }
-            else {
-                *dead_counter += 1;
             }
         }
     }
@@ -319,7 +317,7 @@ impl Publisher {
                     // first the retransmits
                     {
                         for index in retransmits.iter() {
-                            //println!("send retransmit {}",index);
+                            println!("send retransmit {}",index);
                             indices.push(*index);
                             if indices.len() >= chunks_per_heartbeat {
                                 break;
@@ -332,7 +330,7 @@ impl Publisher {
 
                     // fill up what's left with remaining chunks
                     while (indices.len() < chunks_per_heartbeat) && (last < total) {
-                        //println!("send regular {}",last);
+                        println!("send regular {}",last);
                         indices.push(last as u32);
                         last += 1;
                     }
@@ -341,7 +339,7 @@ impl Publisher {
                     if indices.len() == 0 {
                         for i in 0..dones.len() {
                             if !dones[i] {
-                                //println!("send leftover {}",i);
+                                println!("send leftover {}",i);
                                 indices.push(i as u32);
                                 if indices.len() >= chunks_per_heartbeat {
                                     break;
@@ -362,7 +360,7 @@ impl Publisher {
                     }
 
                     // send heartbeat
-                    //println!("send heartbeat");
+                    println!("send heartbeat");
                     let mut send_buffer = Vec::<u8>::new();
                     PublisherToSubscriber::Heartbeat(id).encode(&mut send_buffer);
                     control.socket.send_to(&send_buffer,control.address).await.expect("error sending heartbeat");
