@@ -88,7 +88,7 @@ impl Publisher {
         domain: &str,
         topic: &str
     ) -> Arc<Publisher> {
-        Publisher::new(pubsub_port,domain,topic,32768,4,150,4,100,false).await
+        Publisher::new(pubsub_port,domain,topic,32768,4,300,0,100,false).await
     }
 
     pub async fn run_participant_connection(self: &Arc<Publisher>,pubsub_port: u16) {

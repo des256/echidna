@@ -129,6 +129,12 @@ impl Subscriber {
         let mut chunks_total = 0usize;
         let mut chunks_ignored = 0usize;
 
+        let mut measure_mbps_nowaste = 0usize;  // total mbps at 0 waste
+        let mut measure_nowaste = 0usize;  // number of messages with 0 waste
+        let mut measure_total = 0usize;  // total number of messages
+        let mut measure_perc_waste = 0usize;  // total waste
+        let mut measure_waste = 0usize;  // number of messages with >0 waste
+
         loop {
 
             // receive heartbeat or chunk
@@ -223,14 +229,24 @@ impl Subscriber {
                             }
                             else {
                                 let end_time = time::Instant::now();
-                                let throughput = chunk.total_bytes / ((end_time - start_time).as_micros() as u64);
+                                let mbps = chunk.total_bytes / ((end_time - start_time).as_micros() as u64);
                                 let waste = (chunks_ignored * 100) / chunks_total;
+
+                                measure_total += 1;
+                                measure_perc_waste += waste;
                                 if waste == 0 {
-                                    println!("==> {:3} MBps, {:2}% <==",throughput,waste);
+                                    measure_nowaste += 1;
+                                    measure_mbps_nowaste += mbps as usize;
                                 }
                                 else {
-                                    println!("    {:3} MBps, {:2}%",throughput,waste);
+                                    measure_waste += 1;
                                 }
+                        
+                                println!("througput {:3} Mbps, nonzero waste {:2}%, avg. waste {:2}%",
+                                    (measure_mbps_nowaste * 100) / measure_nowaste,
+                                    (measure_waste * 100) / measure_total,
+                                    (measure_perc_waste * 100) / measure_waste
+                                );
 
                                 on_data(&state.buffer);
                             }
