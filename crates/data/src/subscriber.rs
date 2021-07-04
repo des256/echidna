@@ -194,7 +194,7 @@ impl Subscriber {
                             //println!("receive {}",chunk.index);
 
                             // copy data into final message buffer
-                            let start = chunk.index as usize * CHUNK_SIZE;
+                            let start = (chunk.index * chunk.chunk_size) as usize;
                             let end = start + chunk.data.len();
                             state.buffer[start..end].copy_from_slice(&chunk.data);
                 

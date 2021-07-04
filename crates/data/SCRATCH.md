@@ -47,15 +47,31 @@ Works very well on local loopback, with small N (< 7). Larger means the heartbea
 
 #### Some Measurements
 
-local loopback on i9/64GB: around 120 MB/s
-local gigabit network: around 44 MB/s
-local loopback and gigabit: 120 MB/s on loopback, 35 MB/s on network
+comparison: iperf3 on TCP does 4596MB/s for local loopback and 112MB/s for network
 
+- IDEA: publisher sends chunks at specific rate, listens to acknowledgments in parallel; Subscriber sends back either Ack (I got everything up to, but not including X), or NAck (I still need X up to, but not including Y). Publisher 
 
+Works kind of. Algorithm starts to complain (lost packets) when rate gets above 5kHz, and this is not enough.
+
+IMPORTANT: Local loopback TCP is probably implemented as memory pipe, so the speeds are not realistic!
+
+So, move test to two machine setup.
+
+This works very well. Maximum TCP throughput is 112 MBytes/sec, and this strategy gets up to 118 MBytes/sec after a few tweaks. There are more things to tune and tweak:
+
+- piggyback heartbeats onto chunks to reduce traffic
+- make interval dynamically adjust to reduce missing chunks
+- reduce the need for mutexes where possible
+
+And finally we need to test with a lot more traffic, especially send messages faster than they can be processed. One strategy, instead of canceling the tasks when a new message appears is to cut the incoming message instead. That way, when the network is really congested, messages are still coming through. --> config setting
+
+Also, when a subscriber disappears, transmitting to that subscriber should stop. --> no copying of subscribers, use mutex
+
+And, if a subscriber doesn't respond after a certain countdown, transmitting to that subscriber should stop. - so in general make sure the transmission always ends, either by success, or by canceling subscribers. --> timeout on read, close associated task
 
 ### Shared Memory
 
-- When subscriber is local, use shared memory to transport the message.
+When subscriber is local, use shared memory to transport the message.
 
 ### Multicast
 

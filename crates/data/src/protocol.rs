@@ -12,12 +12,6 @@ use {
     },
 };
 
-pub const CHUNK_SIZE: usize = 32768;
-pub const CHUNKS_PER_HEARTBEAT: usize = 8;
-pub const TRANSMIT_INTERVAL_USEC: u64 = 100;
-pub const WAITS_BEFORE_HEARTBEAT: usize = 4;
-//pub const RETRANSMIT_TIMEOUT_USEC: u64 = 10000;
-
 pub type MessageId = u64;
 pub type ParticipantId = u64;
 pub type PublisherId = u64;
@@ -28,6 +22,7 @@ pub struct Chunk {
     pub ts: u64,
     pub id: MessageId,
     pub total_bytes: u64,
+    pub chunk_size: u32,
     pub total: u32,
     pub index: u32,
     pub data: Vec<u8>,
