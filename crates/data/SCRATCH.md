@@ -69,6 +69,8 @@ Also, when a subscriber disappears, transmitting to that subscriber should stop.
 
 And, if a subscriber doesn't respond after a certain countdown, transmitting to that subscriber should stop. - so in general make sure the transmission always ends, either by success, or by canceling subscribers. --> timeout on read, close associated task
 
+Assuming incoming data is queued, replacing the two task system with just one task per subscriber works.
+
 ### Shared Memory
 
 When subscriber is local, use shared memory to transport the message.

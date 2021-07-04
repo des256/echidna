@@ -223,11 +223,9 @@ impl Subscriber {
                             }
                             else {
                                 let end_time = time::Instant::now();
-                                let size_mb = (chunk.total_bytes as f32) / 1000000.0;
-                                let dur_sec = ((end_time - start_time).as_nanos() as f32) / 1000000000.0;
-                                let throughput = size_mb / dur_sec;
+                                let throughput = chunk.total_bytes / ((end_time - start_time).as_micros() as u64);
                                 let waste = (chunks_ignored * 100) / chunks_total;
-                                println!("done, throughput: {:6.3} MBps, waste: {:6.3} %",throughput,waste);
+                                println!("{:3} MBps, {:2}%",throughput,waste);
 
                                 on_data(&state.buffer);
                             }

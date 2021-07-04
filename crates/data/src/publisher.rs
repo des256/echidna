@@ -23,7 +23,6 @@ use {
 pub struct SubscriberControl {
     pub address: SocketAddr,
     pub socket: net::UdpSocket,
-    pub no_reads: usize,
 }
 
 pub struct Publisher {
@@ -38,6 +37,7 @@ pub struct Publisher {
     pub favor_incoming: bool,
     pub subs: Mutex<HashMap<SubscriberId,Arc<SubscriberControl>>>,
     pub tasks: Mutex<HashMap<SubscriberId,task::JoinHandle<()>>>,
+    pub finished: Arc<Mutex<HashMap<SubscriberId,bool>>>,
 }
 
 impl Publisher {
@@ -69,6 +69,7 @@ impl Publisher {
             favor_incoming: favor_incoming,
             subs: Mutex::new(HashMap::new()),  // subscribers as maintained by the participant
             tasks: Mutex::new(HashMap::new()),
+            finished: Arc::new(Mutex::new(HashMap::new())),
         });
 
         // spawn participant receiver
@@ -87,7 +88,7 @@ impl Publisher {
         domain: &str,
         topic: &str
     ) -> Arc<Publisher> {
-        Publisher::new(pubsub_port,domain,topic,32768,4,100,0,100,false).await
+        Publisher::new(pubsub_port,domain,topic,32768,4,150,4,100,false).await
     }
 
     pub async fn run_participant_connection(self: &Arc<Publisher>,pubsub_port: u16) {
@@ -117,7 +118,6 @@ impl Publisher {
                                     state_subs.insert(*id,Arc::new(SubscriberControl {
                                         address: s.address,
                                         socket: net::UdpSocket::bind("0.0.0.0:0").await.expect("cannot create publisher socket"),
-                                        no_reads: 0,
                                     }));
                                 }
                             },
@@ -132,7 +132,6 @@ impl Publisher {
                                 state_subs.insert(id,Arc::new(SubscriberControl {
                                     address: subscriber.address,
                                     socket: net::UdpSocket::bind("0.0.0.0:0").await.expect("cannot create publisher socket"),
-                                    no_reads: 0,
                                 }));
                             },
                             ParticipantToPublisher::DropSub(id) => {
@@ -166,19 +165,31 @@ impl Publisher {
             }
         }
 
-        /*// cancel current tasks
-        {
-            let mut tasks = self.send_tasks.lock().await;
-            for task in tasks.iter() {
-                task.abort();
+        // if new incoming value is more important (for slow updates), cancel current message
+        if self.favor_incoming {
+            {
+                let mut tasks = self.tasks.lock().await;
+                for (_,task) in tasks.iter() {
+                    task.abort();
+                }
+                *tasks = HashMap::new();
             }
-            *tasks = Vec::new();
-            let mut tasks = self.recv_tasks.lock().await;
-            for task in tasks.iter() {
-                task.abort();
+        }
+
+        // otherwise, if still transmitting a message, let that message be transmitted fully
+        else {
+            let mut all_done = true;
+            let finished = self.finished.lock().await;
+            for (_,done) in finished.iter() {
+                if !done {
+                    all_done = false;
+                    break;
+                }
             }
-            *tasks = Vec::new();
-        }*/
+            if !all_done {
+                return;
+            }
+        }
 
         // calculate number of chunks for this message
         let total_bytes = message.len();
@@ -232,6 +243,16 @@ impl Publisher {
         // take snapshot of current subscriber set
         let subs = self.subs.lock().await.clone();
 
+        // clear finished flags
+        {
+            let mut new_finished = HashMap::<SubscriberId,bool>::new();
+            for (subscriber_id,_) in subs.iter() {
+                new_finished.insert(*subscriber_id,false);
+            }
+            let mut finished = self.finished.lock().await;
+            *finished = new_finished;
+        }
+
         // spawn send and recv tasks for each subscriber
         let mut send_tasks = HashMap::<SubscriberId,task::JoinHandle<()>>::new();
         for (subscriber_id,control) in subs.iter() {
@@ -239,6 +260,7 @@ impl Publisher {
             let sub_id = *subscriber_id;
             let chunks = Arc::clone(&master_chunks);
             let control = Arc::clone(&control);
+            let finished = Arc::clone(&self.finished);
 
             let chunks_per_heartbeat = self.chunks_per_heartbeat;
             let intervals_before_heartbeat = self.intervals_before_heartbeat;
@@ -310,11 +332,11 @@ impl Publisher {
                     control.socket.send_to(&send_buffer,control.address).await.expect("error sending heartbeat");
 
                     // flush incoming acks and nacks
+                    // TODO: it's currently not exactly flushing, but rather processing at most one message
                     let mut buffer = vec![0u8; 65536];
 
                     if let Err(_) = time::timeout(time::Duration::from_micros(transmit_interval_usec),control.socket.recv_from(&mut buffer)).await {
                         dead_counter += 1;
-                        println!("no reply: {}",dead_counter);
                     }
                     else {
         
@@ -371,12 +393,18 @@ impl Publisher {
                         for i in 0..dones.len() {
                             if !dones[i] {
                                 done = false;
-                                println!("done.");
                                 break;
                             }
                         }
                     }
                 }
+
+                if done {
+                    println!("done, dead counter {}.",dead_counter);
+                }
+
+                let mut finished = finished.lock().await;
+                *finished.get_mut(&sub_id).unwrap() = true;
 
             }));
         }

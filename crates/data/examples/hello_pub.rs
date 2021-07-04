@@ -23,7 +23,7 @@ async fn async_main() {
     loop {
         publisher.send(&buffer).await;
         
-        time::sleep(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(1)).await;
     }
 }
 
