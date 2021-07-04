@@ -156,63 +156,6 @@ impl Publisher {
         }
     }
 
-    pub async fn process_acks(id: SubscriberId,control: &SubscriberControl,retransmits: &mut HashSet<u32>,dones: &mut Vec<bool>,interval_usec: u64,num_intervals: usize,dead_counter: &mut usize) {
-
-        let mut buffer = vec![0u8; 65536];
-
-        let end_instant = time::Instant::now() + time::Duration::from_micros(interval_usec * (num_intervals as u64));
-
-        while time::Instant::now() < end_instant {
-
-            // receive acks and nacks
-            if let Err(_) = time::timeout(time::Duration::from_micros(interval_usec),control.socket.recv_from(&mut buffer)).await {
-                *dead_counter += 1;
-            }
-            else {
-
-                if let Some((_,stp)) = SubscriberToPublisher::decode(&buffer) {
-
-                    match stp {
-
-                        SubscriberToPublisher::Ack(message_id,index) => {
-
-                            // subscriber has everything until index
-
-                            if message_id == id {
-                                println!("received ack {}",index);
-
-                                // mark received chunks
-                                for i in 0..index {
-                                    dones[i as usize] = true;
-                                }
-                            }
-
-                        },
-
-                        SubscriberToPublisher::NAck(message_id,first,last) => {
-
-                            // subscriber is missing first..last
-
-                            if message_id == id {
-                                println!("received nack {}-{}",first,last);
-
-                                // mark received chunks
-                                for i in 0..first {
-                                    dones[i as usize] = true;
-                                }
-
-                                // and notice the retransmits
-                                for index in first..last {
-                                    retransmits.insert(index);
-                                }
-                            }
-                        },
-                    }
-                }
-            }
-        }
-    }
-
     pub async fn send(self: &Arc<Publisher>,message: &[u8]) {
 
         // if there are no subscribers, ignore
@@ -309,6 +252,7 @@ impl Publisher {
                 let mut last = 0usize;
                 let mut dead_counter = 0usize;
                 let mut done = false;
+                let mut interval = time::interval(time::Duration::from_micros(transmit_interval_usec));
 
                 while !done {
 
@@ -317,7 +261,7 @@ impl Publisher {
                     // first the retransmits
                     {
                         for index in retransmits.iter() {
-                            println!("send retransmit {}",index);
+                            //println!("send retransmit {}",index);
                             indices.push(*index);
                             if indices.len() >= chunks_per_heartbeat {
                                 break;
@@ -330,7 +274,7 @@ impl Publisher {
 
                     // fill up what's left with remaining chunks
                     while (indices.len() < chunks_per_heartbeat) && (last < total) {
-                        println!("send regular {}",last);
+                        //println!("send regular {}",last);
                         indices.push(last as u32);
                         last += 1;
                     }
@@ -339,7 +283,7 @@ impl Publisher {
                     if indices.len() == 0 {
                         for i in 0..dones.len() {
                             if !dones[i] {
-                                println!("send leftover {}",i);
+                                //println!("send leftover {}",i);
                                 indices.push(i as u32);
                                 if indices.len() >= chunks_per_heartbeat {
                                     break;
@@ -351,23 +295,73 @@ impl Publisher {
                     // send chunks
                     for index in indices.iter() {
                         control.socket.send_to(&chunks[*index as usize],control.address).await.expect("error sending chunk");
-                        Publisher::process_acks(sub_id,&control,&mut retransmits,&mut dones,transmit_interval_usec,1,&mut dead_counter).await;
+                        interval.tick().await;
                     }
 
                     // wait before sending heartbeat
-                    if intervals_before_heartbeat > 0 {
-                        Publisher::process_acks(sub_id,&control,&mut retransmits,&mut dones,transmit_interval_usec,intervals_before_heartbeat,&mut dead_counter).await;
+                    for _ in 0..intervals_before_heartbeat {
+                        interval.tick().await;
                     }
 
                     // send heartbeat
-                    println!("send heartbeat");
+                    //println!("send heartbeat");
                     let mut send_buffer = Vec::<u8>::new();
                     PublisherToSubscriber::Heartbeat(id).encode(&mut send_buffer);
                     control.socket.send_to(&send_buffer,control.address).await.expect("error sending heartbeat");
-                    Publisher::process_acks(sub_id,&control,&mut retransmits,&mut dones,transmit_interval_usec,1,&mut dead_counter).await;
+
+                    // flush incoming acks and nacks
+                    let mut buffer = vec![0u8; 65536];
+
+                    if let Err(_) = time::timeout(time::Duration::from_micros(transmit_interval_usec),control.socket.recv_from(&mut buffer)).await {
+                        dead_counter += 1;
+                        println!("no reply: {}",dead_counter);
+                    }
+                    else {
+        
+                        if let Some((_,stp)) = SubscriberToPublisher::decode(&buffer) {
+        
+                            match stp {
+        
+                                SubscriberToPublisher::Ack(message_id,index) => {
+        
+                                    // subscriber has everything until index
+        
+                                    if message_id == id {
+                                        //println!("received ack {}",index);
+        
+                                        // mark received chunks
+                                        for i in 0..index {
+                                            dones[i as usize] = true;
+                                        }
+                                    }
+        
+                                },
+        
+                                SubscriberToPublisher::NAck(message_id,first,last) => {
+        
+                                    // subscriber is missing first..last
+        
+                                    if message_id == id {
+                                        //println!("received nack {}-{}",first,last);
+        
+                                        // mark received chunks
+                                        for i in 0..first {
+                                            dones[i as usize] = true;
+                                        }
+        
+                                        // and notice the retransmits
+                                        for index in first..last {
+                                            retransmits.insert(index);
+                                        }
+                                    }
+                                },
+                            }
+                        }
+                    }
 
                     // if subscriber hasn't responded for a specific time, exit loop
                     if dead_counter >= dead_counter_intervals {
+                        println!("subscriber died.");
                         break;
                     }
 
@@ -377,14 +371,13 @@ impl Publisher {
                         for i in 0..dones.len() {
                             if !dones[i] {
                                 done = false;
+                                println!("done.");
                                 break;
                             }
                         }
                     }
                 }
 
-                println!("done.");
-            
             }));
         }
 
