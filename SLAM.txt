@@ -1,0 +1,103 @@
+SLAM
+
+1. detect/describe: find points of interest in each frame; each PoI has 2D coordinates and a description (256 coefficients)
+2. matching: match as many points as possible on the relevant frames by minimal signature difference
+3. matches provide homography for original problem (for tracking and mapping)
+
+key point describers & detectors:
+
+    specification:
+
+        distinguishable regardless of viewpoint or illumination:
+            exist at different scale
+            strong gradients
+
+        robust to occlusion:
+            must be local
+
+        discriminative neighborhood:
+            signal changes, strong gradients
+
+        accurate location:
+            signal changes, strong gradients
+
+    classical:
+
+        hessian detector
+        harris detector
+        gaussian difference detector
+
+    handcrafted multiscale filters:
+
+        TCDET (548k)
+        SuperPoint (940k)
+        LFNet (39k)
+        Tiny-Key.Net (260) very good
+        Key.Net (5.8k) Key.Net-SI seems best
+
+    towards describing:
+
+        detect -> describe: detect features, then find autoencoded representation of the features
+
+        detect & describe: detect and describe features with the same network
+
+        describe to detect: describe everything into dense representation, and then figure out which points are relevant
+
+            high absolute and relative saliency:
+
+                absolute: variance across feature channels
+
+                relative: variance between spatial neighbors
+
+descriptors:
+
+    classical:
+
+        normalized cross-correlation
+        local binary patterns
+        SIFT
+
+    deep learning:
+
+        SIFT
+        Binary (BRIEF, BRISK, FREAK, CARD, LDB) -> hamming distance
+        WxBS
+        BOLD
+
+        CNN:
+
+            LIFT
+            DELF
+            SuperPoint
+            LFNet
+            D2Net
+            RFNet-L2Net
+            R2D2
+
+matching:
+    
+    triplet loss very successful
+
+    MatchNet
+    PNNet
+    SOSNet
+
+    second order statistics:
+
+        SOLAR, add self-attention to the network
+
+HDD-Net:
+
+    hardcoded gabor filters + L2Net + feature fusion -> descriptor map HxWx256
+
+    Gabor filters have:
+        rotational convolution
+        positive + negative response maps
+        cyclic pooling
+
+    train detector and descriptor at the same time, use triplet loss to help training
+
+    HyNet: same with hybrid metric to protect positive/negative similarity
+
+Reduce parameters in L2-Net
+
